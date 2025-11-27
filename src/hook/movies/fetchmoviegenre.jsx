@@ -1,18 +1,37 @@
-import React from 'react'
-import Tmdb from '@/api/tmdb'
+"use client"
+import { useState,useEffect } from "react"
+import axios from "axios"
 
-const FetchMovieGenre = async(id) => {
- try {
-    const res = await Tmdb.get("/discover/movie",{
-        params : {
-             with_genres: id,
+export default function useFetchGenreMovies(id){
+    const [data,setData] = useState([])
+    const [loading,SetLoading] = useState(true)
+    const [error,setError] = useState(null)
+
+    useEffect(()=>{
+        if(!id) return
+
+        let ignore = false
+
+        async function fetchData(){
+            try {
+                const res = await axios.get("/api/movie/genre" ,{
+                    params:{
+                        id:id,
+                    }
+                })
+                if(!ignore)setData(res.data.results)
+            } catch (error) {
+                if(!ignore) setError(error)
+            }
+        finally{
+            if(!ignore)SetLoading(false)
         }
-    })
-    return res.data.results
+        }
+        fetchData()
+        return ()=>{
+            ignore = true
+        }
+    },[id])
 
- } catch (error) {
-console.log(error)
- }
+    return {data,loading,error}
 }
-
-export default FetchMovieGenre

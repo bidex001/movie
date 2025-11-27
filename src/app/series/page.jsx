@@ -9,7 +9,7 @@ import AppContext from '@/context/context'
 const Series = () => {
   const {darkMode} = useContext(AppContext)
   return (
-    <div className={`flex  flex-col h-fit min-h-screen w-full bg-[snow] relative ${darkMode? "bg-gray-900 text-gray-100":""}`}>
+    <div className={`flex  flex-col h-fit min-h-screen w-full  relative bg-gray-900 text-gray-100`}>
         <Header/>
         <Main/>
         <Footer/>

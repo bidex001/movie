@@ -1,0 +1,2004 @@
+diff --git a/next.config.mjs b/next.config.mjs
+index 5a335e4..f28726b 100644
+--- a/next.config.mjs
++++ b/next.config.mjs
+@@ -1,11 +1,9 @@
+ /** @type {import('next').NextConfig} */
+ const nextConfig = {
+-      images: {
+-    domains: ['cdn.weatherapi.com'],
+-  },
+-    images: {
+-    domains: ["image.tmdb.org"],
++  images: {
++    domains: ["cdn.weatherapi.com", "image.tmdb.org"], // merged into one array
+   },
+ };
+ 
+ export default nextConfig;
++
+diff --git a/src/api/tmdb.jsx b/src/api/tmdb.jsx
+deleted file mode 100644
+index 36b22dc..0000000
+--- a/src/api/tmdb.jsx
++++ /dev/null
+@@ -1,36 +0,0 @@
+-"use client"
+-import axios from "axios";
+-
+-const Tmdb = axios.create({
+-   baseURL:"https://api.themoviedb.org/3",
+-   params:{
+-    api_key:process.env.NEXT_PUBLIC_TMDB_API_KEY,
+-    language: "en-us",
+-    page: 1
+-   }
+-})
+-
+-Tmdb.interceptors.response.use((response)=>{
+-try {
+-   if(response.config.url.includes("/movie/popular")) {
+-     response.data.results = response.data.results.slice(0,10)
+-   }
+-   return response;
+-   
+-} catch (error) {
+-    console.log(error)
+-}
+-})
+-
+-Tmdb.interceptors.response.use((response)=>{
+-try {
+-   if(response.config.url.includes("/tv/popular")) {
+-     response.data.results = response.data.results.slice(0,10)
+-   }
+-   return response;
+-   
+-} catch (error) {
+-    console.log(error)
+-}
+-})
+-export default Tmdb
+\ No newline at end of file
+diff --git a/src/app/movie/component/card.jsx b/src/app/movie/component/card.jsx
+index 85f0173..684f0ad 100644
+--- a/src/app/movie/component/card.jsx
++++ b/src/app/movie/component/card.jsx
+@@ -1,11 +1,31 @@
+ import React from "react";
+ import Image from "next/image";
+ import { BiCameraMovie } from "react-icons/bi";
++import { useRouter } from "next/navigation";
++import { useContext } from "react";
++import AppContext from "@/context/context";
++import { usePathname } from "next/navigation";
++import { FaCheck } from "react-icons/fa";
+ 
+ const Card = ({ title, image, id }) => {
+   const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL;
++  const {setMovieId,setSeriesId} = useContext(AppContext)
++  const router = useRouter()
++  const pathName = usePathname()
++
+   return (
+-    <div className=" shrink-0 w-[200px] h-[250px] hover:scale-105 flex flex-col relative ">
++    <div className=" shrink-0 w-[200px] h-[250px] max-md:h-[200px] max-md:w-[150px]  hover:scale-105 max-sm:active:scale-105 flex flex-col relative "
++    onClick={()=>{
++      if(pathName == "/"){
++        setMovieId(id)
++        router.push(`/${id}`)
++      }
++      else if(pathName == "/series"){
++        setSeriesId(id)
++        router.push(`/series/${id}`)
++      }
++    }}
++    >
+       {image ? (
+         <Image
+           src={`${baseImgUrl + image}`}
+           alt={title}
+           width={200}
+           height={250}
+           priority
++          className="w-full h-full object-cover rounded-md shadow-md"
+         />
+       ) : (
+         <div className="w-full h-full flex items-center justify-center bg-gray-800">
+           <BiCameraMovie className="text-4xl text-gray-500" />
+         </div>
+       )}
++      <div className="flex items-start gap-2 *:opacity-0 *:font-inconsolata font-semibold hover:*:opacity-100 max-sm:active:*:opacity-100 absolute top-[0px] left-[0px] w-full *:transition-opacity max-md:*:text-sm *:duration-500 *:delay-500 hover:bg-black/50 max-sm:active:bg-black/50 bg-transparent h-full p-2 " >
++        <p>{title}</p>
++        <button className="border p-1 rounded-lg cursor-pointer active:bg-green-600"
++        title="Add to favourite"><FaCheck/></button>
++      </div>
+     </div>
++    
+   );
+ };
+ 
+ export default Card;
++
+diff --git a/src/app/movie/component/gener/actionmovies.jsx b/src/app/movie/component/gener/actionmovies.jsx
+index cc044c9..9a5a948 100644
+--- a/src/app/movie/component/gener/actionmovies.jsx
++++ b/src/app/movie/component/gener/actionmovies.jsx
+@@ -1,59 +1,42 @@
+ import React, { useEffect, useState } from "react";
+-import FetchMovieGenre from "@/hook/movies/fetchmoviegenre";
++import useFetchGenreMovies from "@/hook/movies/fetchmoviegenre";
+ import Loading from "../loading";
+-import Image from "next/image";
+ import Card from "../card";
+ 
+ const ActionMovies = () => {
+-  const [action, SetAction] = useState(null);
+-  const [actionLoad, setActionLoad] = useState(false);
++  const {data,loading,error} = useFetchGenreMovies(28)
+ 
+   const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL;
+ 
+-  useEffect(() => {
+-    async function getAction() {
+-      try {
+-        setActionLoad(true);
+-        const res = await FetchMovieGenre(28);
+-        SetAction(res);
+-        setActionLoad(false);
+-      } catch (error) {
+-        console.log(error);
+-      }
+-    }
+-    getAction();
+-  }, []);
++
+   return (
+-    <div className="flex w-full flex-col overflow-hidden mb-[20px]">
+-      <h1 className=" font-bold text-2xl  z-[1000] font-inconsolata  capitalize px-2.5">
++    <div className="flex w-full flex-col overflow-hidden">
++      <h1 className=" font-bold text-2xl max-md:text-xl max-sm:text-lg  z-[1000] font-inconsolata  capitalize px-2.5">
+         action movies
+       </h1>
+-      <div className="flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[330px]">
+-        {actionLoad
++      <div className="flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[100%]">
++        {loading
+           ? Array(10)
+               .fill("")
+               .map((item, index) => {
+                 return (
+                   <div
+                     key={index}
+-                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 text-7xl shadow-md"
++                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 max-sm:active:scale-105 text-7xl shadow-md"
+                   >
+                     {" "}
+                     <Loading />
+                   </div>
+                 );
+               })
+-          : action &&
+-            action.map((item, index) => {
++          : data &&
++            data.map((item, index) => {
+               return (
+                 <div
+                   key={index}
+-                  className=" shrink-0 w-[200px] h-[250px] hover:scale-105"
++                  className=" shrink-0"
+                 >
+-                  <Card key={index} image={item.poster_path} id={item.id} />
+-                  <h1 className="  text-center font-semibold font-inconsolata text-lg w-full truncate">
+-                    {item.title}
+-                  </h1>
++                  <Card key={index} image={item.poster_path} id={item.id} title={item.title} />
+                 </div>
+               );
+             })}
+diff --git a/src/app/movie/component/gener/adventure.jsx b/src/app/movie/component/gener/adventure.jsx
+index 1772085..48dde32 100644
+--- a/src/app/movie/component/gener/adventure.jsx
++++ b/src/app/movie/component/gener/adventure.jsx
+@@ -1,48 +1,34 @@
+ import React, { useEffect, useState } from "react";
+-import FetchMovieGenre from "@/hook/movies/fetchmoviegenre";
++import useFetchGenreMovies from "@/hook/movies/fetchmoviegenre";
+ import Loading from "../loading";
+ import Image from "next/image";
+ import Card from "../card";
+ 
+ const AdventureMovies = () => {
+-  const [action, SetAction] = useState(null);
+-  const [actionLoad, setActionLoad] = useState(false);
++  const {data,loading,error} = useFetchGenreMovies(12)
+ 
+   const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
+ 
+-  useEffect(() => {
+-    async function getAction() {
+-      try {
+-        setActionLoad(true);
+-        const res = await FetchMovieGenre(12);
+-        SetAction(res);
+-        setActionLoad(false);
+-      } catch (error) {
+-        console.log(error);
+-      }
+-    }
+-    getAction();
+-  }, []);
++
+   return (
+-    <div className="flex w-full flex-col overflow-hidden mb-[20px]">
+-      <h1 className=' font-bold text-2xl  z-[1000] font-inconsolata  capitalize px-2.5'>adventure</h1>
+-      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[330px]'>
+-        {actionLoad
++    <div className="flex w-full flex-col overflow-hidden ">
++      <h1 className=' font-bold text-2xl max-md:text-xl max-sm:text-lg  z-[1000] font-inconsolata  capitalize px-2.5'>adventure</h1>
++      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3 '>
++        {loading
+           ? Array(10).fill("").map((item, index) => {
+                 return (
+                   <div
+                     key={index}
+-                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 text-7xl shadow-md"
++                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 max-sm:active:scale-105 text-7xl shadow-md"
+                   > <Loading/>
+                   </div>
+                 );
+               })
+-          : action &&
+-            action.map((item, index) => {
++          : data &&
++            data.map((item, index) => {
+               return (
+-                <div key={index}  className=' shrink-0 w-[200px] h-[250px] hover:scale-105'>
+-                 <Card key={index} image={item.poster_path} id={item.id} />
+-                  <h1 className='  text-center font-semibold font-inconsolata text-lg w-full truncate'>{item.title}</h1>
++                <div key={index}  className=' shrink-0'>
++                 <Card key={index} image={item.poster_path} id={item.id} title={item.title} />
+                 </div>
+               );
+             })}
+diff --git a/src/app/movie/component/gener/animation.jsx b/src/app/movie/component/gener/animation.jsx
+index 3b7fbb5..f1dee9e 100644
+--- a/src/app/movie/component/gener/animation.jsx
++++ b/src/app/movie/component/gener/animation.jsx
+@@ -1,48 +1,32 @@
+ import React, { useEffect, useState } from "react";
+-import FetchMovieGenre from "@/hook/movies/fetchmoviegenre";
++import useFetchGenreMovies from "@/hook/movies/fetchmoviegenre";
+ import Loading from "../loading";
+-import Image from "next/image";
+ import Card from "../card";
+ 
+ const AnimationMovies = () => {
+-  const [action, SetAction] = useState(null);
+-  const [actionLoad, setActionLoad] = useState(false);
++  const {data,loading,error} = useFetchGenreMovies(16)
+ 
+   const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
+ 
+-  useEffect(() => {
+-    async function getAction() {
+-      try {
+-        setActionLoad(true);
+-        const res = await FetchMovieGenre(16);
+-        SetAction(res);
+-        setActionLoad(false);
+-      } catch (error) {
+-        console.log(error);
+-      }
+-    }
+-    getAction();
+-  }, []);
+   return (
+-    <div className="flex w-full flex-col overflow-hidden mb-[20px]">
+-      <h1 className=' font-bold text-2xl  z-[1000] font-inconsolata  capitalize px-2.5'>animation</h1>
+-      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[330px]'>
+-        {actionLoad
++    <div className="flex w-full flex-col overflow-hidden ">
++      <h1 className=' font-bold text-2xl max-md:text-xl max-sm:text-lg  z-[1000] font-inconsolata  capitalize px-2.5'>animation</h1>
++      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  '>
++        {loading
+           ? Array(10).fill("").map((item, index) => {
+                 return (
+                   <div
+                     key={index}
+-                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 text-7xl shadow-md"
++                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 max-sm:active:scale-105 text-7xl shadow-md"
+                   > <Loading/>
+                   </div>
+                 );
+               })
+-          : action &&
+-            action.map((item, index) => {
++          : data &&
++            data.map((item, index) => {
+               return (
+-                <div key={index}  className=' shrink-0 w-[200px] h-[250px] hover:scale-105'>
+-                  <Card key={index} image={item.poster_path} id={item.id} />
+-                  <h1 className='  text-center font-semibold font-inconsolata text-lg w-full truncate'>{item.title}</h1>
++                <div key={index}  className=' shrink-0'>
++                  <Card key={index} image={item.poster_path} id={item.id} title={item.title} />
+                 </div>
+               );
+             })}
+diff --git a/src/app/movie/component/gener/comedy.jsx b/src/app/movie/component/gener/comedy.jsx
+index d999e10..c5520e5 100644
+--- a/src/app/movie/component/gener/comedy.jsx
++++ b/src/app/movie/component/gener/comedy.jsx
+@@ -1,48 +1,32 @@
+ import React, { useEffect, useState } from "react";
+-import FetchMovieGenre from "@/hook/movies/fetchmoviegenre";
++import useFetchGenreMovies from "@/hook/movies/fetchmoviegenre";
+ import Loading from "../loading";
+-import Image from "next/image";
+ import Card from "../card";
+ 
+ const ComedyMovies = () => {
+-  const [action, SetAction] = useState(null);
+-  const [actionLoad, setActionLoad] = useState(false);
++  const {data,loading,error} = useFetchGenreMovies(35)
+ 
+   const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
+ 
+-  useEffect(() => {
+-    async function getAction() {
+-      try {
+-        setActionLoad(true);
+-        const res = await FetchMovieGenre(35);
+-        SetAction(res);
+-        setActionLoad(false);
+-      } catch (error) {
+-        console.log(error);
+-      }
+-    }
+-    getAction();
+-  }, []);
+   return (
+-    <div className="flex w-full flex-col overflow-hidden mb-[20px]">
+-      <h1 className=' font-bold text-2xl  z-[1000] font-inconsolata  capitalize px-2.5'>comedy</h1>
+-      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[330px]'>
+-        {actionLoad
++    <div className="flex w-full flex-col overflow-hidden ">
++      <h1 className=' font-bold text-2xl max-lg:text-xl max-md:text-lg  z-[1000] font-inconsolata  capitalize px-2.5'>comedy</h1>
++      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-fit'>
++        {loading
+           ? Array(10).fill("").map((item, index) => {
+                 return (
+                   <div
+                     key={index}
+-                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 text-7xl shadow-md"
++                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 max-sm:active:scale-105 text-7xl shadow-md"
+                   > <Loading/>
+                   </div>
+                 );
+               })
+-          : action &&
+-            action.map((item, index) => {
++          : data &&
++            data.map((item, index) => {
+               return (
+-                <div key={index}  className=' shrink-0 w-[200px] h-[250px] hover:scale-105'>
+-                <Card key={index} image={item.poster_path} id={item.id} />
+-                  <h1 className='  text-center font-semibold font-inconsolata text-lg w-full truncate'>{item.title}</h1>
++                <div key={index}  className=' shrink-0'>
++                <Card key={index} image={item.poster_path} id={item.id} title={item.title} />
+                 </div>
+               );
+             })}
+diff --git a/src/app/movie/component/gener/crime.jsx b/src/app/movie/component/gener/crime.jsx
+index a7cd204..7cdb6a1 100644
+--- a/src/app/movie/component/gener/crime.jsx
++++ b/src/app/movie/component/gener/crime.jsx
+@@ -1,48 +1,32 @@
+ import React, { useEffect, useState } from "react";
+-import FetchMovieGenre from "@/hook/movies/fetchmoviegenre";
++import useFetchGenreMovies from "@/hook/movies/fetchmoviegenre";
+ import Loading from "../loading";
+-import Image from "next/image";
+ import Card from "../card";
+ 
+ const CrimeMovies = () => {
+-  const [action, SetAction] = useState(null);
+-  const [actionLoad, setActionLoad] = useState(false);
++  const {data,loading,error} = useFetchGenreMovies(80)
+ 
+   const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
+ 
+-  useEffect(() => {
+-    async function getAction() {
+-      try {
+-        setActionLoad(true);
+-        const res = await FetchMovieGenre(80);
+-        SetAction(res);
+-        setActionLoad(false);
+-      } catch (error) {
+-        console.log(error);
+-      }
+-    }
+-    getAction();
+-  }, []);
+   return (
+-    <div className="flex w-full flex-col overflow-hidden mb-[20px]">
+-      <h1 className=' font-bold text-2xl  z-[1000] font-inconsolata  capitalize px-2.5'>crime</h1>
+-      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[330px]'>
+-        {actionLoad
++    <div className="flex w-full flex-col overflow-hidden">
++      <h1 className=' font-bold text-2xl max-lg:text-xl max-md:text-lg  z-[1000] font-inconsolata  capitalize px-2.5'>crime</h1>
++      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  '>
++        {loading
+           ? Array(10).fill("").map((item, index) => {
+                 return (
+                   <div
+                     key={index}
+-                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 text-7xl shadow-md"
++                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 max-sm:active:scale-105 text-7xl shadow-md"
+                   > <Loading/>
+                   </div>
+                 );
+               })
+-          : action &&
+-            action.map((item, index) => {
++          : data &&
++            data.map((item, index) => {
+               return (
+-                <div key={index}  className=' shrink-0 w-[200px] h-[250px] hover:scale-105'>
+-                 <Card key={index} image={item.poster_path} id={item.id} />
+-                  <h1 className='  text-center font-semibold font-inconsolata text-lg w-full truncate'>{item.title}</h1>
++                <div key={index}  className=' shrink-0 '>
++                 <Card key={index} image={item.poster_path} id={item.id} title={item.title} />
+                 </div>
+               );
+             })}
+diff --git a/src/app/movie/component/gener/documentry.jsx b/src/app/movie/component/gener/documentry.jsx
+index 85774e0..50f6583 100644
+--- a/src/app/movie/component/gener/documentry.jsx
++++ b/src/app/movie/component/gener/documentry.jsx
+@@ -1,48 +1,32 @@
+ import React, { useEffect, useState } from "react";
+-import FetchMovieGenre from "@/hook/movies/fetchmoviegenre";
++import useFetchGenreMovies from "@/hook/movies/fetchmoviegenre";
+ import Loading from "../loading";
+-import Image from "next/image";
+ import Card from "../card";
+ 
+ const DocumentaryMovies = () => {
+-  const [action, SetAction] = useState(null);
+-  const [actionLoad, setActionLoad] = useState(false);
++  const{data,loading,error} = useFetchGenreMovies(99)
+ 
+   const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
+ 
+-  useEffect(() => {
+-    async function getAction() {
+-      try {
+-        setActionLoad(true);
+-        const res = await FetchMovieGenre(99);
+-        SetAction(res);
+-        setActionLoad(false);
+-      } catch (error) {
+-        console.log(error);
+-      }
+-    }
+-    getAction();
+-  }, []);
+   return (
+-    <div className="flex w-full flex-col overflow-hidden mb-[20px]">
+-      <h1 className=' font-bold text-2xl  z-[1000] font-inconsolata  capitalize px-2.5'>documentary</h1>
+-      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[330px]'>
+-        {actionLoad
++    <div className="flex w-full flex-col overflow-hidden">
++      <h1 className=' font-bold text-2xl max-md:text-xl max-sm:text-lg z-[1000] font-inconsolata  capitalize px-2.5'>documentary</h1>
++      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  '>
++        {loading
+           ? Array(10).fill("").map((item, index) => {
+                 return (
+                   <div
+                     key={index}
+-                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 text-7xl shadow-md"
++                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 max-sm:active:scale-105 text-7xl shadow-md"
+                   > <Loading/>
+                   </div>
+                 );
+               })
+-          : action &&
+-            action.map((item, index) => {
++          : data &&
++            data.map((item, index) => {
+               return (
+-                <div key={index}  className=' shrink-0 w-[200px] h-[250px] hover:scale-105'>
+-                  <Card key={index} image={item.poster_path} id={item.id} />
+-                  <h1 className='  text-center font-semibold font-inconsolata text-lg w-full truncate'>{item.title}</h1>
++                <div key={index}  className=' shrink-0 '>
++                  <Card key={index} image={item.poster_path} id={item.id} title={item.title} />
+                 </div>
+               );
+             })}
+diff --git a/src/app/movie/component/gener/fantasy.jsx b/src/app/movie/component/gener/fantasy.jsx
+index d1459ee..2104dcc 100644
+--- a/src/app/movie/component/gener/fantasy.jsx
++++ b/src/app/movie/component/gener/fantasy.jsx
+@@ -1,48 +1,32 @@
+ import React, { useEffect, useState } from "react";
+-import FetchMovieGenre from "@/hook/movies/fetchmoviegenre";
++import useFetchGenreMovies from "@/hook/movies/fetchmoviegenre";
+ import Loading from "../loading";
+-import Image from "next/image";
+ import Card from "../card";
+ 
+ const FantasyMovies = () => {
+-  const [action, SetAction] = useState(null);
+-  const [actionLoad, setActionLoad] = useState(false);
++  const {data,loading,error} = useFetchGenreMovies(14)
+ 
+   const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
+ 
+-  useEffect(() => {
+-    async function getAction() {
+-      try {
+-        setActionLoad(true);
+-        const res = await FetchMovieGenre(14);
+-        SetAction(res);
+-        setActionLoad(false);
+-      } catch (error) {
+-        console.log(error);
+-      }
+-    }
+-    getAction();
+-  }, []);
+   return (
+-    <div className="flex w-full flex-col overflow-hidden mb-[20px]">
+-      <h1 className=' font-bold text-2xl  z-[1000] font-inconsolata  capitalize px-2.5'>fantasy</h1>
+-      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[330px]'>
+-        {actionLoad
++    <div className="flex w-full flex-col overflow-hidden ">
++      <h1 className=' font-bold text-2xl max-md:text-xl max-sm:text-lg  z-[1000] font-inconsolata  capitalize px-2.5'>fantasy</h1>
++      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  '>
++        {loading
+           ? Array(10).fill("").map((item, index) => {
+                 return (
+                   <div
+                     key={index}
+-                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 text-7xl shadow-md"
++                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 max-sm:active:scale-105 text-7xl shadow-md"
+                   > <Loading/>
+                   </div>
+                 );
+               })
+-          : action &&
+-            action.map((item, index) => {
++          : data &&
++            data.map((item, index) => {
+               return (
+-                <div key={index}  className=' shrink-0 w-[200px] h-[250px] hover:scale-105'>
+-                 <Card key={index} image={item.poster_path} id={item.id} />
+-                  <h1 className='  text-center font-semibold font-inconsolata text-lg w-full truncate'>{item.title}</h1>
++                <div key={index}  className=' shrink-0 '>
++                 <Card key={index} image={item.poster_path} id={item.id} title={item.title}/>
+                 </div>
+               );
+             })}
+diff --git a/src/app/movie/component/gener/horror.jsx b/src/app/movie/component/gener/horror.jsx
+index 99a5b23..69be4b8 100644
+--- a/src/app/movie/component/gener/horror.jsx
++++ b/src/app/movie/component/gener/horror.jsx
+@@ -1,49 +1,32 @@
+ import React, { useEffect, useState } from "react";
+-import FetchMovieGenre from "@/hook/movies/fetchmoviegenre";
++import useFetchGenreMovies from "@/hook/movies/fetchmoviegenre";
+ import Loading from "../loading";
+-import Image from "next/image";
+ import Card from "../card";
+ 
+ const HorrorMovies = () => {
+-  const [action, SetAction] = useState(null);
+-  const [actionLoad, setActionLoad] = useState(false);
++  const {data,loading,error} = useFetchGenreMovies(27)
+ 
+   const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
+ 
+-  useEffect(() => {
+-    async function getAction() {
+-      try {
+-        setActionLoad(true);
+-        const res = await FetchMovieGenre(27);
+-        SetAction(res);
+-        setActionLoad(false);
+-      } catch (error) {
+-        console.log(error);
+-      }
+-    }
+-    getAction();
+-  }, []);
+   return (
+-    <div className="flex w-full flex-col overflow-hidden mb-[20px]">
+-      <h1 className=' font-bold text-2xl  z-[1000] font-inconsolata  capitalize px-2.5'>horror</h1>
+-      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3 h-[330px]'>
+-        {actionLoad
++    <div className="flex w-full flex-col overflow-hidden ">
++      <h1 className=' font-bold text-2xl  z-[1000] max-lg:text-xl max-md:text-lg font-inconsolata  capitalize px-2.5'>horror</h1>
++      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3 '>
++        {loading
+           ? Array(10).fill("").map((item, index) => {
+                 return (
+                   <div
+                     key={index}
+-                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 text-7xl shadow-md"
++                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 max-sm:active:scale-105 text-7xl shadow-md"
+                   > <Loading/>
+                   </div>
+                 );
+               })
+-          : action &&
+-            action.map((item, index) => {
+-              console.log(item)
++          : data &&
++            data.map((item, index) => {             
+               return (
+-                <div key={index}  className=' shrink-0 w-[200px] h-[250px] hover:scale-105'>
+-                  <Card key={index} image={item.poster_path} id={item.id} />
+-                  <h1 className='  text-center font-semibold font-inconsolata text-lg w-full truncate'>{item.title}</h1>
++                <div key={index} className=' shrink-0 '>
++                  <Card key={index} image={item.poster_path} id={item.id} title={item.title} />
+                 </div>
+               );
+             })}
+diff --git a/src/app/movie/component/gener/romance.jsx b/src/app/movie/component/gener/romance.jsx
+index 9041824..606305e 100644
+--- a/src/app/movie/component/gener/romance.jsx
++++ b/src/app/movie/component/gener/romance.jsx
+@@ -1,48 +1,32 @@
+ import React, { useEffect, useState } from "react";
+-import FetchMovieGenre from "@/hook/movies/fetchmoviegenre";
++import useFetchGenreMovies from "@/hook/movies/fetchmoviegenre";
+ import Loading from "../loading";
+-import Image from "next/image";
+ import Card from "../card";
+ 
+ const RomanceMovies = () => {
+-  const [action, SetAction] = useState(null);
+-  const [actionLoad, setActionLoad] = useState(false);
++  const {data,loading,error} = useFetchGenreMovies(10749)
+ 
+   const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
+ 
+-  useEffect(() => {
+-    async function getAction() {
+-      try {
+-        setActionLoad(true);
+-        const res = await FetchMovieGenre(10749);
+-        SetAction(res);
+-        setActionLoad(false);
+-      } catch (error) {
+-        console.log(error);
+-      }
+-    }
+-    getAction();
+-  }, []);
+   return (
+-    <div className="flex w-full flex-col overflow-hidden mb-[20px]">
+-      <h1 className=' font-bold text-2xl  z-[1000] font-inconsolata  capitalize px-2.5'>romance</h1>
+-      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[330px]'>
+-        {actionLoad
++    <div className="flex w-full flex-col overflow-hidden">
++      <h1 className=' font-bold text-2xl max-md:text-xl max-sm:text-lg  z-[1000] font-inconsolata  capitalize px-2.5'>romance</h1>
++      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  '>
++        {loading
+           ? Array(10).fill("").map((item, index) => {
+                 return (
+                   <div
+                     key={index}
+-                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 text-7xl shadow-md"
++                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 max-sm:active:scale-105 text-7xl shadow-md"
+                   > <Loading/>
+                   </div>
+                 );
+               })
+-          : action &&
+-            action.map((item, index) => {
++          : data &&
++            data.map((item, index) => {
+               return (
+-                <div key={index}  className=' shrink-0 w-[200px] h-[250px] hover:scale-105'>
+-                 <Card key={index} image={item.poster_path} id={item.id} />
+-                  <h1 className='  text-center font-semibold font-inconsolata text-lg w-full truncate'>{item.title}</h1>
++                <div key={index}  className=' shrink-0 '>
++                 <Card key={index} image={item.poster_path} id={item.id} title={item.title} />
+                 </div>
+               );
+             })}
+diff --git a/src/app/movie/component/gener/sciencfic.jsx b/src/app/movie/component/gener/sciencfic.jsx
+index fb8c412..529031a 100644
+--- a/src/app/movie/component/gener/sciencfic.jsx
++++ b/src/app/movie/component/gener/sciencfic.jsx
+@@ -1,48 +1,32 @@
+ import React, { useEffect, useState } from "react";
+-import FetchMovieGenre from "@/hook/movies/fetchmoviegenre";
++import useFetchGenreMovies from "@/hook/movies/fetchmoviegenre";
+ import Loading from "../loading";
+-import Image from "next/image";
+ import Card from "../card";
+ 
+ const SciMovies = () => {
+-  const [action, SetAction] = useState(null);
+-  const [actionLoad, setActionLoad] = useState(false);
++  const {data,loading,error} = useFetchGenreMovies(878)
+ 
+   const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
+ 
+-  useEffect(() => {
+-    async function getAction() {
+-      try {
+-        setActionLoad(true);
+-        const res = await FetchMovieGenre(878);
+-        SetAction(res);
+-        setActionLoad(false);
+-      } catch (error) {
+-        console.log(error);
+-      }
+-    }
+-    getAction();
+-  }, []);
+   return (
+-    <div className="flex w-full flex-col overflow-hidden mb-[20px]">
+-      <h1 className=' font-bold text-2xl  z-[1000] font-inconsolata  capitalize px-2.5'>sci-fic</h1>
+-      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[330px]'>
+-        {actionLoad
++    <div className="flex w-full flex-col overflow-hidden ">
++      <h1 className=' font-bold text-2xl max-md:text-xl max-sm:text-lg  z-[1000] font-inconsolata  capitalize px-2.5'>sci-fic</h1>
++      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3 '>
++        {loading
+           ? Array(10).fill("").map((item, index) => {
+                 return (
+                   <div
+                     key={index}
+-                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 text-7xl shadow-md"
++                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 max-sm:active:scale-105 text-7xl shadow-md"
+                   > <Loading/>
+                   </div>
+                 );
+               })
+-          : action &&
+-            action.map((item, index) => {
++          : data &&
++            data.map((item, index) => {
+               return (
+-                <div key={index}  className=' shrink-0 w-[200px] h-[250px] hover:scale-105'>
+-                 <Card key={index} image={item.poster_path} id={item.id} />
+-                  <h1 className='  text-center font-semibold font-inconsolata text-lg w-full truncate'>{item.title}</h1>
++                <div key={index}  className=' shrink-0'>
++                 <Card key={index} image={item.poster_path} id={item.id} title={item.title}/>
+                 </div>
+               );
+             })}
+diff --git a/src/app/movie/component/gener/thriller.jsx b/src/app/movie/component/gener/thriller.jsx
+index 11bbdb6..75cc94f 100644
+--- a/src/app/movie/component/gener/thriller.jsx
++++ b/src/app/movie/component/gener/thriller.jsx
+@@ -1,48 +1,32 @@
+ import React, { useEffect, useState } from "react";
+-import FetchMovieGenre from "@/hook/movies/fetchmoviegenre";
++import useFetchGenreMovies from "@/hook/movies/fetchmoviegenre";
+ import Loading from "../loading";
+-import Image from "next/image";
+ import Card from "../card";
+ 
+ const ThrilMovies = () => {
+-  const [action, SetAction] = useState(null);
+-  const [actionLoad, setActionLoad] = useState(false);
++  const {data,loading,error} = useFetchGenreMovies(53)
+ 
+   const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
+ 
+-  useEffect(() => {
+-    async function getAction() {
+-      try {
+-        setActionLoad(true);
+-        const res = await FetchMovieGenre(53);
+-        SetAction(res);
+-        setActionLoad(false);
+-      } catch (error) {
+-        console.log(error);
+-      }
+-    }
+-    getAction();
+-  }, []);
+   return (
+-    <div className="flex w-full flex-col overflow-hidden mb-[20px]">
+-      <h1 className=' font-bold text-2xl  z-[1000] font-inconsolata  capitalize px-2.5'>thriller</h1>
+-      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[330px]'>
+-        {actionLoad
++    <div className="flex w-full flex-col overflow-hidden ">
++      <h1 className=' font-bold text-2xl max-md:text-xl max-sm:text-lg  z-[1000] font-inconsolata  capitalize px-2.5'>thriller</h1>
++      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3 '>
++        {loading
+           ? Array(10).fill("").map((item, index) => {
+                 return (
+                   <div
+                     key={index}
+-                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 text-7xl shadow-md"
++                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 max-sm:active:scale-105 text-7xl shadow-md"
+                   > <Loading/>
+                   </div>
+                 );
+               })
+-          : action &&
+-            action.map((item, index) => {
++          : data &&
++            data.map((item, index) => {
+               return (
+-                <div key={index}  className=' shrink-0 w-[200px] h-[250px] hover:scale-105'>
+-                 <Card key={index} image={item.poster_path} id={item.id} />
+-                  <h1 className='  text-center font-semibold font-inconsolata text-lg w-full truncate'>{item.title}</h1>
++                <div key={index}  className=' shrink-0 '>
++                 <Card key={index} image={item.poster_path} id={item.id} title={item.title} />
+                 </div>
+               );
+             })}
+diff --git a/src/app/movie/component/gener/war.jsx b/src/app/movie/component/gener/war.jsx
+index 1f665ca..efbf0bb 100644
+--- a/src/app/movie/component/gener/war.jsx
++++ b/src/app/movie/component/gener/war.jsx
+@@ -1,48 +1,31 @@
+ import React, { useEffect, useState } from "react";
+-import FetchMovieGenre from "@/hook/movies/fetchmoviegenre";
++import useFetchGenreMovies from "@/hook/movies/fetchmoviegenre";
+ import Loading from "../loading";
+-import Image from "next/image";
+ import Card from "../card";
+ 
+ const WarMovies = () => {
+-  const [action, SetAction] = useState(null);
+-  const [actionLoad, setActionLoad] = useState(false);
++ const {data,loading,error} = useFetchGenreMovies(10752)
+ 
+   const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
+-
+-  useEffect(() => {
+-    async function getAction() {
+-      try {
+-        setActionLoad(true);
+-        const res = await FetchMovieGenre(10752);
+-        SetAction(res);
+-        setActionLoad(false);
+-      } catch (error) {
+-        console.log(error);
+-      }
+-    }
+-    getAction();
+-  }, []);
+   return (
+-    <div className="flex w-full flex-col overflow-hidden mb-[20px]">
+-      <h1 className=' font-bold text-2xl  z-[1000] font-inconsolata capitalize px-2.5'>War</h1>
+-      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[330px]'>
+-        {actionLoad
++    <div className="flex w-full flex-col overflow-hidden">
++      <h1 className=' font-bold text-2xl max-md:text-xl max-sm:text-lg  z-[1000] font-inconsolata capitalize px-2.5'>War</h1>
++      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3 '>
++        {loading
+           ? Array(10).fill("").map((item, index) => {
+                 return (
+                   <div
+                     key={index}
+-                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 text-7xl shadow-md"
++                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 max-sm:active:scale-105 text-7xl shadow-md"
+                   > <Loading/>
+                   </div>
+                 );
+               })
+-          : action &&
+-            action.map((item, index) => {
++          : data &&
++            data.map((item, index) => {
+               return (
+-                <div key={index}  className=' shrink-0 w-[200px] h-[250px] hover:scale-105'>
+-                 <Card key={index} image={item.poster_path} id={item.id} />
+-                  <h1 className='  text-center font-semibold font-inconsolata text-lg w-full truncate'>{item.title}</h1>
++                <div key={index}  className=' shrink-0'>
++                 <Card key={index} image={item.poster_path} id={item.id} title={item.title} />
+                 </div>
+               );
+             })}
+diff --git a/src/app/movie/component/gener/western.jsx b/src/app/movie/component/gener/western.jsx
+index 936e7c7..67fae7f 100644
+--- a/src/app/movie/component/gener/western.jsx
++++ b/src/app/movie/component/gener/western.jsx
+@@ -1,48 +1,32 @@
+ import React, { useEffect, useState } from "react";
+-import FetchMovieGenre from "@/hook/movies/fetchmoviegenre";
++import useFetchGenreMovies from "@/hook/movies/fetchmoviegenre";
+ import Loading from "../loading";
+-import Image from "next/image";
+ import Card from "../card";
+ 
+ const WestMovies = () => {
+-  const [action, SetAction] = useState(null);
+-  const [actionLoad, setActionLoad] = useState(false);
++  const {data,loading,error} = useFetchGenreMovies(37)
+ 
+   const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
+ 
+-  useEffect(() => {
+-    async function getAction() {
+-      try {
+-        setActionLoad(true);
+-        const res = await FetchMovieGenre(37);
+-        SetAction(res);
+-        setActionLoad(false);
+-      } catch (error) {
+-        console.log(error);
+-      }
+-    }
+-    getAction();
+-  }, []);
+   return (
+-    <div className="flex w-full flex-col overflow-hidden mb-[20px]">
+-      <h1 className=' font-bold text-2xl  z-[1000] font-inconsolata capitalize px-2.5'>western</h1>
+-      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[330px]'>
+-        {actionLoad
++    <div className="flex w-full flex-col overflow-hidden ">
++      <h1 className=' font-bold text-2xl max-md:text-xl max-sm:text-lg  z-[1000] font-inconsolata capitalize px-2.5'>western</h1>
++      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3 '>
++        {loading
+           ? Array(10).fill("").map((item, index) => {
+                 return (
+                   <div
+                     key={index}
+-                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 text-7xl shadow-md"
++                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 max-sm:active:scale-105 text-7xl shadow-md"
+                   > <Loading/>
+                   </div>
+                 );
+               })
+-          : action &&
+-            action.map((item, index) => {
++          : data &&
++            data.map((item, index) => {
+               return (
+-                <div key={index}  className=' shrink-0 w-[200px] h-[250px] hover:scale-105'>
+-               <Card key={index} image={item.poster_path} id={item.id} />
+-                  <h1 className='  text-center font-semibold font-inconsolata text-lg w-full truncate'>{item.title}</h1>
++                <div key={index}  className=' shrink-0'>
++               <Card key={index} image={item.poster_path} id={item.id} title={item.title} />
+                 </div>
+               );
+             })}
+diff --git a/src/app/movie/component/headerMovie.jsx b/src/app/movie/component/headerMovie.jsx
+index d9218b6..3781add 100644
+--- a/src/app/movie/component/headerMovie.jsx
++++ b/src/app/movie/component/headerMovie.jsx
+@@ -1,27 +1,69 @@
+-"use client"
+-import React from 'react'
++"use client";
++import React, { useState } from "react";
+ import { MdMovie } from "react-icons/md";
+-import { FaSearch,FaMoon,FaSun } from "react-icons/fa";
+-import { useContext } from 'react';
+-import AppContext from '@/context/context';
++import { FaSearch } from "react-icons/fa";
++import { useContext } from "react";
++import AppContext from "@/context/context";
++import Link from "next/link";
++import { useRouter } from "next/navigation";
++import useSearch from "@/hook/search/useSearch";
++import SearchResults from "./SearchResults";
+ 
+ const Header = () => {
+-  const {darkMode,setDarkMode} = useContext(AppContext)
+-  return (
+-    <div className='flex w-full justify-between py-3 px-4 shadow-xl bg-transparent  fixed z-[1000]'>
+-      <h1 className='flex font-inconsolata items-center text-white font-bold text-3xl gap-1'>bbMovie <MdMovie  className=' text-[#b49a07]'/></h1>
+-      <form className='rounded-2xl overflow-hidden w-[600px] gap-2 bg-[#808080af] flex justify-center items-center'>
+-        <input type="text" placeholder='search for a movie' className='flex-1 p-[10px] capitalize outline-none focus:outline-none' />
+-        <button className='  cursor-pointer active:scale-90 text-white font-bold text-3xl py-[10px] px-[20px]'><FaSearch /></button>
+-      </form>
++  const { darkMode, setDarkMode } = useContext(AppContext);
++  const router = useRouter();
++  const [query, setQuery] = useState("");
++  const { data: searchResults } = useSearch(query);
+ 
+-      <button className=' text-4xl cursor-pointer text-white active:scale-105'
+-      onClick={()=>{
+-        setDarkMode(!darkMode)
+-      }}
+-      >{darkMode?<FaSun/> : <FaMoon/>}</button>
++  function handleChangeMode(e) {
++    router.push(e.target.value);
++  }
++  return (
++    <div className="border w-full flex justify-center">
++      <div className="flex w-[1200px] max-xl:w-[1000px] max-lg:w-[800px] max-md:w-[600px] max-sm:w-[98%] rounded-4xl mt-4 backdrop-blur-3xl  justify-between max-md:justify-center max-md:gap-7 max-sm:justify-between max-sm:gap-0 py-3 px-4 max-md:px-2 shadow-xl bg-transparent  fixed z-[1000]">
++        <h1 className="flex font-inconsolata max-md:text-xl items-center text-white font-bold text-3xl gap-1">
++          bbMovie <MdMovie className=" text-[#b49a07]" />
++        </h1>
++        <form className="rounded-2xl overflow-hidden w-[600px] max-md:w-[250px]  max-xl:w-[450px] max-lg:w-[350px] max-sm:w-[180px] max-sm:bg-[#8080802f]  gap-2 bg-[#808080af] flex justify-center items-center relative">
++          <input
++            type="text"
++            placeholder="search for a movie"
++            className="flex-1 p-[10px] text-center capitalize max-lg:text-sm max-md:text-xs outline-none focus:outline-none"
++            value={query}
++            onChange={(e) => setQuery(e.target.value)}
++          />
++          <button className="  cursor-pointer max-lg:text-sm active:scale-90 max-sm:hidden text-white font-bold text-3xl max-xl:text-2xl py-[10px] max-sm:p-0 px-[20px]">
++            <FaSearch />
++          </button>
++          {searchResults && query && (
++            <SearchResults results={searchResults} setQuery={setQuery} />
++          )}
++        </form>
++        <div className="flex items-center gap-4 max-md:hidden">
++          <Link href={"/"}>
++            <button className="cursor-pointer border-3 rounded-2xl max-xl:rounded-xl px-5 font-inconsolata font-bold text-2xl max-xl:text-xl bg-black text-white capitalize border-[#b49a07] active:scale-125 ">
++              movies
++            </button>
++          </Link>
++          <Link href={"/series"}>
++            <button className="cursor-pointer border-3 rounded-2xl max-xl:rounded-xl px-5 font-inconsolata font-bold text-2xl max-xl:text-xl bg-black text-white capitalize border-[#b49a07] active:scale-125 ">
++              series
++            </button>
++          </Link>
++        </div>
++        <div className="  hidden max-md:flex justify-center text-white items-center gap-2">
++          <select
++            onChange={(e) => router.push(e.target.value)}
++            defaultValue="/"
++            className="flex items-center border-3 bg-black px-3 cursor-pointer py-1 text-sm capitalize rounded-lg justify-center border-[#b49a07]"
++          >
++            <option value="/">movie</option>
++            <option value="/series">series</option>
++          </select>
++        </div>
++      </div>
+     </div>
+-  )
+-}
++  );
++};
+ 
+-export default Header
+\ No newline at end of file
++export default Header;
+diff --git a/src/app/movie/component/mainMovie.jsx b/src/app/movie/component/mainMovie.jsx
+index 0fb6cb2..19d36e2 100644
+--- a/src/app/movie/component/mainMovie.jsx
++++ b/src/app/movie/component/mainMovie.jsx
+@@ -23,14 +23,6 @@ const Main = () => {
+   return (
+     <div className='flex flex-col flex-1 gap-2 items-center'>
+        <div className=' w-full flex h-full relative'>
+-         <aside className='absolute backdrop-blur-lg mt-[74px] z-[500] justify-center w-[250px] px-[10px] py-[40px] *:rounded-2xl *:active:scale-110 *:cursor-pointer  h-[87%] text-white flex flex-col gap-3 text-3xl font-bold *:capitalize *:tracking-wider font-inconsolata *:text-center'>
+-            <Link href={"/"} className='bg-[#a5a3a379]'>
+-            <button className='bg-[]'>movies</button>
+-            </Link>
+-            <Link href={"/series"} className='bg-[#a5a3a3e2]'>
+-            <button>series</button>
+-            </Link>
+-        </aside>
+         <Slider/>
+        </div>
+        <Popular/>
+diff --git a/src/app/movie/component/popular.jsx b/src/app/movie/component/popular.jsx
+index 8cd6122..1c3cf1e 100644
+--- a/src/app/movie/component/popular.jsx
++++ b/src/app/movie/component/popular.jsx
+@@ -1,48 +1,46 @@
+ 
+-import { useEffect,useState } from 'react'
+-import fetchPopular from '@/hook/movies/fetchPopular'
+-import Image from 'next/image'
++import { useEffect,useState ,useContext} from 'react'
++import useFetchPopularMovies from '@/hook/movies/fetchPopular'
+ import Loading from './loading'
+-import Card from './card'
++import { useRouter } from 'next/navigation'
++import Image from 'next/image'
++import AppContext from '@/context/context'
+ 
+ const Popular = () => {
+-    const [popular,setPopular] = useState([])
+-    const [popLoading,setPopLoading] = useState(false)
+-
+-    const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
+-
+-       useEffect(()=>{
+-        async function getData (){
+-            setPopLoading(true)
+-            const res = await fetchPopular()
+-            setPopular(res)
+-            setPopLoading(false)
+-        }
+-        getData()
+-    },[])
+-
++   const {data,loading,error} = useFetchPopularMovies()
++   const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL;
++   const {setMovieId} = useContext(AppContext)
++   const router = useRouter()
+ 
+   return (
+     <div className=' flex flex-col w-full gap-1 px-1 mt-3'>
+-             <h1 className=' font-bold text-2xl  z-[1000] font-inconsolata  capitalize px-2.5'>trending</h1>
+-        <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[330px]'>
++             <h1 className=' font-bold text-2xl  z-[1000] font-inconsolata max-lg:text-xl max-md:text-lg  capitalize px-2.5'>trending</h1>
++        <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3 h-[200px] max-sm:py-1  max-sm:px-2   max-lg:h-[160px] max-sm:h-[135px] '>
+             {
+-               popLoading? Array(10).fill("").map((item,index)=>{
++               loading? Array(10).fill("").map((item,index)=>{
+                 return(
+                     <div 
+                     key={index}
+-                    className=' shrink-0 w-[200px] h-[250px] hover:scale-105 text-7xl shadow-md'
++                    className=' shrink-0 w-[200px] h-[250px] hover:scale-105 max-sm:active:scale-105 text-7xl shadow-md'
+                     ><Loading/></div>
+                 )
+                }):
+-                popular && popular.map((item,index)=>{
++                data && data.map((item,index)=>{
+                     return(
+-                        <div key={index} className=' shrink-0 w-[200px] h-[250px] hover:scale-105 flex flex-col relative '>
+-                         <Card
+-                         key={index}
+-                         image={item.poster_path}
+-                         id={item.id}/>
+-                            <h1 className='  text-center font-semibold font-inconsolata text-lg w-full absolute bottom-[-75px] truncate'>{item.title}</h1>
++                        <div key={index} className=' shrink-0 w-[350px] h-[170px] max-lg:w-[250px] max-lg:h-[130px] max-sm:w-[200px] max-sm:h-[110px]  hover:scale-105 max-sm:active:scale-105 flex flex-col relative '
++                        onClick={()=>{
++                            setMovieId(item.id)
++                            router.push(`/${item.id}`)
++                        }}
++                        >
++                        <Image
++                        className=' w-full h-full'
++                        src={`${baseImgUrl}${item.backdrop_path}`}
++                        alt={`${item.name}`}
++                        width={350}
++                        height={180}
++                        />
++                            <h1 className='  text-center font-semibold font-inconsolata text-lg max-lg:text-sm w-full absolute bottom-[-30px] max-lg:bottom-[-20px] truncate'>{item.title}</h1>
+                         </div>
+                     )
+                 })
+diff --git a/src/app/movie/component/slider.jsx b/src/app/movie/component/slider.jsx
+index ed33e6e..18b54fe 100644
+--- a/src/app/movie/component/slider.jsx
++++ b/src/app/movie/component/slider.jsx
+@@ -1,76 +1,87 @@
++"use client";
+ import { useEffect, useRef, useState } from "react";
+-import fetchTrending from "@/hook/movies/fetchTrending";
++import useFetchTrendingMovies from "@/hook/movies/fetchTrending";
+ import Image from "next/image";
+ import Loading from "./loading";
++import { useContext } from "react";
++import AppContext from "@/context/context";
++import { useRouter } from "next/navigation";
+ 
+ const Slider = () => {
+-    const banner = useRef(null);
+-  const [trending, setTrending] = useState([]);
+-  const [currentSlide,setCurrentSlide] = useState(0)
+-  const [trendLoading, setTrendLoading] = useState(false);
++  const { data, error, loading } = useFetchTrendingMovies();
++  const banner = useRef(null);
++  const [currentSlide, setCurrentSlide] = useState(0);
++  const router = useRouter();
++  const { setMovieId } = useContext(AppContext);
+ 
+-  const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
++  const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL;
+ 
+-  useEffect(()=>{
+-      async function getTrending(){
+-            setTrendLoading(true)
+-            const res = await fetchTrending()
+-            let value =  [...res,res[0]]
+-            setTrending(value)
+-            setTrendLoading(false)
+-        }
+-        getTrending()
+-  },[])
++  useEffect(() => {
++    if (data.length == 0) return;
++    const scroll = setInterval(() => {
++      setCurrentSlide((prev) => (prev >= data.length - 1 ? 0 : prev + 1));
++    }, 7000);
++    return () => clearInterval(scroll);
++  }, [data]);
+ 
+-  useEffect(()=>{
+-    if(trending.length == 0 ) return
+-    const scroll = setInterval(()=>{
+-        setCurrentSlide((prev) => 
+-            prev >= trending.length -1? 0 : prev + 1
+-        )
+-    },7000)
+-    return ()=> clearInterval(scroll)
+-  },[trending])
+-
+-
+-
+-
+-  return(
++  return (
+     <div className=" w-full h-full flex justify-center ">
+-            <div className='flex w-[1700px] h-[600px] overflow-hidden relative'
++      <div
++        className="flex w-[1700px] h-[600px] overflow-hidden relative"
+         ref={banner}
+-        >
+-            <div className="absolute backdrop-blur-sm  right-[100px] bottom-[20px] z-[1000] flex flex-col gap-3 w-[600px] p-[10px] ">
+-                <h1 className=" min-w-[500px] font-inconsolata px-2 w-fit min-h-[50px] text-center font-bold text-4xl">{trending[currentSlide]?.title}</h1>
+-                <p>{trending && trending[currentSlide]?.overview}</p>
+-                <button className=" border text-2xl font-bold w-[200px] font-inconsolata capitalize  cursor-pointer px-4 py-1.5 active:scale-90">more details</button>
+-            </div>
+-            <div className={`flex w-fit h-100 ${currentSlide === 0 ?"duration-0":"duration-700"} text-[200px]`}
+-            style={{transform : `translateX(-${currentSlide * (banner.current ? banner.current.clientWidth : 0)}px)`}}
++      >
++        <div className="w-full h-1/2 absolute bottom-0 flex justify-center items-center   z-50 bg-gradient-to-b from-transparent to-gray-900 ">
++          <div className="absolute  left-[100px] max-lg:left-0  max-lg:px-3 bottom-[20px] z-[1000] flex flex-col gap-3 w-[600px] max-xl:w-[800px] max-lg:w-full p-[10px]  ">
++            <h1 className=" min-w-[500px] max-sm:min-w-full  font-inconsolata px-2 w-fit min-h-[50px] max-md:min-h-[20px] text-center max-lg:text-left font-bold text-4xl max-md:text-3xl max-sm:text-2xl">
++              {data && data[currentSlide]?.title}
++            </h1>
++            <p className=" max-sm:text-xs">{data && data[currentSlide]?.overview}</p>
++            <button
++              className="flex hover:[&>span]:w-full max-sm:active:[&>span]:w-full overflow-hidden items-center border-2 w-40 max-sm:w-30 rounded-full cursor-pointer border-[#b49a07] justify-center capitalize text-white relative text-xl max-sm:text-lg font-semibold p-2 max-sm:px-2 max-sm:py-1 gap-1"
++              onClick={() => {
++                setMovieId(data[currentSlide]?.id);
++                router.push(`/${data[currentSlide]?.id}`);
++              }}
+             >
+-                {
+-                   trendLoading? 
+-                   <div className=' w-[1400px] h-[450px] shadow-lg shadow-[black] flex'><Loading/></div>:
+-                    trending && trending.map((item,index)=>{
+-                        return(
+-                            <div 
+-                            key={index}
+-                            className=' h-fit w-fit shrink-0'
+-                            >
+-                                <Image
+-                                src={`${baseImgUrl + item.backdrop_path}`}
+-                                alt={item.title}
+-                                width={1600}
+-                                height={400}
+-                                />
+-                            </div>
+-                        )
+-                    })
+-                }
++              <span className="absolute -z-1 duration-500 block left-0 top-0 h-full w-0 bg-blue-500"></span>
++              more info
++            </button>
++          </div>
++        </div>
++        <div
++          className={`flex w-fit h-100   ${
++            currentSlide === 0 ? "duration-0" : "duration-700"
++          } text-[200px]`}
++          style={{
++            transform: `translateX(-${
++              currentSlide * (banner.current ? banner.current.clientWidth : 0)
++            }px)`,
++          }}
++        >
++          {loading ? (
++            <div className=" w-[1400px] h-[450px] shadow-lg shadow-[black] flex">
++              <Loading />
+             </div>
++          ) : (
++            data &&
++            data.map((item, index) => {
++              return (
++                <div key={index} className=" h-fit w-fit max-lg:h-[800px] shrink-0">
++                  <Image
++                    src={`${baseImgUrl + item.backdrop_path}`}
++                    alt={item.name? item.name : "image"}
++                    width={1600}
++                    height={800}
++                    className=" w-fit h-fit object-cover max-lg:h-[800px]"
++                  />
++                </div>
++              );
++            })
++          )}
+         </div>
++      </div>
+     </div>
+-  )
++  );
+ };
+ 
+ export default Slider;
+diff --git a/src/app/page.jsx b/src/app/page.jsx
+index eff122c..a1b4191 100644
+--- a/src/app/page.jsx
++++ b/src/app/page.jsx
+@@ -9,7 +9,7 @@ const Movie = () => {
+   const{darkMode} = useContext(AppContext)
+   
+   return (
+-    <div className={`flex  flex-col h-fit min-h-screen w-full bg-[snow] relative ${darkMode? "bg-gray-900 text-gray-100":""}`}>
++    <div className={`flex  flex-col h-fit min-h-screen w-full text-gray-100 relative bg-gray-900`}>
+         <Header/>
+         <Main/>
+         <Footer/>
+diff --git a/src/app/series/component/header.jsx b/src/app/series/component/header.jsx
+index d05b185..27fa48d 100644
+--- a/src/app/series/component/header.jsx
++++ b/src/app/series/component/header.jsx
+@@ -1,26 +1,69 @@
+-import React from 'react'
++"use client";
++import React, { useState } from "react";
+ import { MdMovie } from "react-icons/md";
+-import { FaMoon, FaSearch,FaSun } from "react-icons/fa";
+-import { useContext } from 'react';
+-import AppContext from '@/context/context';
++import { FaSearch } from "react-icons/fa";
++import { useContext } from "react";
++import AppContext from "@/context/context";
++import Link from "next/link";
++import { useRouter } from "next/navigation";
++import useSearch from "@/hook/search/useSearch";
++import SearchResults from "@/app/movie/component/SearchResults";
+ 
+ const Header = () => {
+-  const {darkMode,setDarkMode} = useContext(AppContext)
+-  return (
+-    <div className='flex w-full justify-between py-3 px-4 shadow-xl bg-transparent  fixed z-[1000]'>
+-      <h1 className='flex font-inconsolata items-center text-white font-bold text-3xl gap-1'>bbMovie <MdMovie  className=' text-[#b49a07]'/></h1>
+-      <form className='rounded-2xl overflow-hidden w-[600px] gap-2 bg-[#808080af] flex justify-center items-center'>
+-        <input type="text" placeholder='search for a movie' className='flex-1 p-[10px] capitalize outline-none focus:outline-none' />
+-        <button className='  cursor-pointer active:scale-90 text-white font-bold text-3xl py-[10px] px-[20px]'><FaSearch /></button>
+-      </form>
++  const { darkMode, setDarkMode } = useContext(AppContext);
++  const router = useRouter();
++  const [query, setQuery] = useState("");
++  const { data: searchResults } = useSearch(query);
+ 
+-      <button className=' text-4xl cursor-pointer text-white active:scale-105'
+-      onClick={()=>{
+-        setDarkMode(!darkMode)
+-      }}
+-      >{darkMode?<FaSun/>:<FaMoon/>}</button>
++  function handleChangeMode(e) {
++    router.push(e.target.value);
++  }
++  return (
++    <div className="border w-full flex justify-center">
++      <div className="flex w-[1200px] max-xl:w-[1000px] max-lg:w-[800px] max-md:w-[600px] max-sm:w-[98%] max-md:justify-center max-md:gap-7 max-sm:justify-between max-sm:gap-0  max-md:px-2 rounded-4xl mt-4 backdrop-blur-3xl justify-between py-3 px-4 shadow-xl bg-transparent  fixed z-[1000]">
++        <h1 className="flex max-md:text-xl font-inconsolata items-center text-white font-bold text-3xl gap-1">
++          bbMovie <MdMovie className=" text-[#b49a07]" />
++        </h1>
++        <form className="rounded-2xl max-md:w-[250px]  max-xl:w-[450px] max-lg:w-[350px] max-sm:w-[180px] max-sm:bg-[#8080802f] overflow-hidden w-[600px] gap-2 bg-[#808080af] flex justify-center items-center relative">
++          <input
++            type="text"
++            placeholder="search for a movie"
++            className="flex-1 p-[10px] capitalize max-lg:text-sm max-md:text-xs outline-none focus:outline-none"
++            value={query}
++            onChange={(e) => setQuery(e.target.value)}
++          />
++          <button className="  cursor-pointer active:scale-90 max-lg:text-sm max-sm:hidden max-xl:text-2xl max-sm:p-0 text-white font-bold text-3xl py-[10px] px-[20px]">
++            <FaSearch />
++          </button>
++          {searchResults && query && (
++            <SearchResults results={searchResults} setQuery={setQuery} />
++          )}
++        </form>
++        <div className="flex items-center gap-4 max-md:hidden">
++          <Link href={"/"}>
++            <button className="cursor-pointer border-3 rounded-2xl px-5 font-inconsolata font-bold bg-black text-white text-2xl capitalize border-[#b49a07] active:scale-125 ">
++              movies
++            </button>
++          </Link>
++          <Link href={"/series"}>
++            <button className="cursor-pointer border-3 rounded-2xl px-5 font-inconsolata font-bold bg-black text-white text-2xl capitalize border-[#b49a07] active:scale-125 ">
++              series
++            </button>
++          </Link>
++        </div>
++        <div className="  hidden max-md:flex justify-center text-white items-center gap-2">
++          <select
++            onChange={(e) => router.push(e.target.value)}
++            defaultValue="/series"
++            className="flex items-center border-3 bg-black px-3 cursor-pointer py-1 text-sm capitalize rounded-lg justify-center border-[#b49a07]"
++          >
++            <option value="/series">series</option>
++            <option value="/">movie</option>
++          </select>
++        </div>
++      </div>
+     </div>
+-  )
+-}
++  );
++};
+ 
+-export default Header
+\ No newline at end of file
++export default Header;
+diff --git a/src/app/series/component/mainSeries.jsx b/src/app/series/component/mainSeries.jsx
+index 8ded0b7..3ade097 100644
+--- a/src/app/series/component/mainSeries.jsx
++++ b/src/app/series/component/mainSeries.jsx
+@@ -17,14 +17,6 @@ const Main = () => {
+   return (
+     <div className='flex flex-col flex-1 gap-2 items-center'>
+        <div className=' w-full flex h-full relative'>
+-         <aside className='absolute backdrop-blur-lg mt-[74px] z-[500] justify-center w-[250px] px-[10px] py-[40px] *:rounded-2xl *:active:scale-110 *:cursor-pointer  h-[87%] text-white flex flex-col gap-3 text-3xl font-bold *:capitalize *:tracking-wider font-inconsolata *:text-center'>
+-            <Link href={"/"} className='bg-[#a5a3a3e2]'>
+-            <button className='bg-[]'>movies</button>
+-            </Link>
+-            <Link href={"/series"} className='bg-[#a5a3a379]' >
+-            <button>series</button>
+-            </Link>
+-        </aside>
+         <Slider/>
+        </div>
+        <Popular/>
+diff --git a/src/app/series/component/popularSeries.jsx b/src/app/series/component/popularSeries.jsx
+index 520b17a..31296a7 100644
+--- a/src/app/series/component/popularSeries.jsx
++++ b/src/app/series/component/popularSeries.jsx
+@@ -1,53 +1,63 @@
+ 
+-import { useEffect,useState } from 'react'
+-import fetchPopular from '@/hook/series/fetchPopularSeries'
+-import Image from 'next/image'
+-import Loading from './SeriesLoading'
+-import Card from '@/app/movie/component/card'
++import useFetchPopularSeries from "@/hook/series/fetchPopularSeries";
++import Loading from "./SeriesLoading";
++import Image from "next/image";
++import { useContext } from "react";
++import AppContext from "@/context/context";
++import { useRouter } from "next/navigation";
+ 
+ const Popular = () => {
+-    const [popular,setPopular] = useState([])
+-    const [popLoading,setPopLoading] = useState(false)
+-
+-    const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
+-
+-       useEffect(()=>{
+-        async function getData (){
+-            setPopLoading(true)
+-            const res = await fetchPopular()
+-            setPopular(res)
+-            setPopLoading(false)
+-        }
+-        getData()
+-    },[])
+-
++  const { data, loading, error } = useFetchPopularSeries();
++  const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL;
++  const {setSeriesId} = useContext(AppContext)
++  const router = useRouter()
+ 
+   return (
+-    <div className=' flex flex-col w-full gap-1 px-1 mt-3'>
+-             <h1 className=' font-bold text-2xl  z-[1000] font-inconsolata capitalize px-2.5'>trending</h1>
+-        <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[330px]'>
+-            {
+-               popLoading? Array(10).fill("").map((item,index)=>{
+-                return(
+-                    <div 
++    <div className=" flex flex-col w-full gap-1 px-1 mt-3">
++      <h1 className=" font-bold text-2xl max-lg:text-xl max-md:text-lg  z-[1000] font-inconsolata capitalize px-2.5">
++        trending
++      </h1>
++      <div className="flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[200px] max-sm:py-1  max-sm:px-2   max-lg:h-[160px] max-sm:h-[135px]">
++        {loading
++          ? Array(10)
++              .fill("")
++              .map((item, index) => {
++                return (
++                  <div
+                     key={index}
+-                    className=' shrink-0 w-[200px] h-[250px] hover:scale-105 text-7xl shadow-md'
+-                    ><Loading/></div>
+-                )
+-               }):
+-                popular && popular.map((item,index)=>{
+-                    return(
+-                        <div key={index} className=' shrink-0 w-[200px] h-[250px] hover:scale-105 flex flex-col relative '>
+-                        <Card key={index} image={item.poster_path} id={item.id} />
+-                            <h1 className='  text-center font-semibold font-inconsolata text-lg w-full absolute bottom-[-75px] truncate'>{item.title}</h1>
+-                        </div>
+-                    )
+-                })
+-            }
+-            
+-        </div>
++                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 max-sm:active:scale-105 text-7xl shadow-md"
++                  >
++                    <Loading />
++                  </div>
++                );
++              })
++          : data &&
++            data.map((item, index) => {
++              return (
++                <div
++                  key={index}
++                  className=" shrink-0 w-[350px] h-[170px] max-lg:w-[250px] max-lg:h-[130px] max-sm:w-[200px] max-sm:h-[110px]  hover:scale-105 max-sm:active:scale-105 flex flex-col relative "
++                  onClick={()=>{
++                    setSeriesId(item.id)
++                    router.push(`/series/${item.id}`)
++                  }}
++                >
++                  <Image
++                    className=" w-full h-full"
++                    src={`${baseImgUrl}${item.backdrop_path}`}
++                    alt={`${item.name}`}
++                    width={350}
++                    height={180}
++                  />
++                  <h1 className="  text-center font-semibold font-inconsolata text-lg max-lg:text-sm w-full absolute bottom-[-30px] max-lg:bottom-[-20px] truncate">
++                    {item.name}
++                  </h1>
++                </div>
++              );
++            })}
++      </div>
+     </div>
+-  )
+-}
++  );
++};
+ 
+-export default Popular
+\ No newline at end of file
++export default Popular;
+diff --git a/src/app/series/component/seriesGenre/DramaSeries.jsx b/src/app/series/component/seriesGenre/DramaSeries.jsx
+index 3d92f8e..8330059 100644
+--- a/src/app/series/component/seriesGenre/DramaSeries.jsx
++++ b/src/app/series/component/seriesGenre/DramaSeries.jsx
+@@ -1,48 +1,31 @@
+ import React, { useEffect, useState } from "react";
+-import FetchSeriesGenre from "@/hook/series/fetchSeriesGener";
++import useFetchGenreSeries from "@/hook/series/fetchSeriesGener";
+ import Loading from "../SeriesLoading";
+ import Image from "next/image";
+ import Card from "@/app/movie/component/card";
+ 
+ const DramaSeries = () => {
+-  const [action, SetAction] = useState(null);
+-  const [actionLoad, setActionLoad] = useState(false);
++ const{data,loading,error} = useFetchGenreSeries(10751)
+ 
+-  const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
+-
+-  useEffect(() => {
+-    async function getAction() {
+-      try {
+-        setActionLoad(true);
+-        const res = await FetchSeriesGenre(10751);
+-        SetAction(res);
+-        setActionLoad(false);
+-      } catch (error) {
+-        console.log(error);
+-      }
+-    }
+-    getAction();
+-  }, []);
+   return (
+-    <div className="flex w-full flex-col overflow-hidden mb-[20px]">
+-      <h1 className=' font-bold text-2xl  z-[1000] font-inconsolata  capitalize px-2.5'>family</h1>
+-      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[330px]'>
+-        {actionLoad
++    <div className="flex w-full flex-col overflow-hidden">
++      <h1 className=' font-bold text-2xl max-md:text-xl max-sm:text-lg   z-[1000] font-inconsolata  capitalize px-2.5'>family</h1>
++      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3 '>
++        {loading
+           ? Array(10).fill("").map((item, index) => {
+                 return (
+                   <div
+                     key={index}
+-                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 text-7xl shadow-md"
++                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 max-sm:active:scale-105 text-7xl shadow-md"
+                   > <Loading/>
+                   </div>
+                 );
+               })
+-          : action &&
+-            action.map((item, index) => {
++          : data &&
++            data.map((item, index) => {
+               return (
+-                <div key={index}  className=' shrink-0 w-[200px] h-[250px] hover:scale-105'>
+-                 <Card key={index} image={item.poster_path} id={item.id} />
+-                  <h1 className='  text-center font-semibold font-inconsolata text-lg w-full truncate'>{item.name}</h1>
++                <div key={index}  className=' shrink-0 '>
++                 <Card key={index} image={item.poster_path} id={item.id} title={item.name}/>
+                 </div>
+               );
+             })}
+diff --git a/src/app/series/component/seriesGenre/actionSeries.jsx b/src/app/series/component/seriesGenre/actionSeries.jsx
+index 0925057..3dbbc19 100644
+--- a/src/app/series/component/seriesGenre/actionSeries.jsx
++++ b/src/app/series/component/seriesGenre/actionSeries.jsx
+@@ -1,48 +1,30 @@
+-import React, { useEffect, useState } from "react";
+-import FetchSeriesGenre from "@/hook/series/fetchSeriesGener";
++import useFetchGenreSeries from "@/hook/series/fetchSeriesGener";
+ import Loading from "../SeriesLoading";
+-import Image from "next/image";
+ import Card from "@/app/movie/component/card";
+ 
+ const ActionSeries = () => {
+-  const [action, SetAction] = useState(null);
+-  const [actionLoad, setActionLoad] = useState(false);
++  const {data,loading,error} = useFetchGenreSeries(10759)
+ 
+-  const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
+ 
+-  useEffect(() => {
+-    async function getAction() {
+-      try {
+-        setActionLoad(true);
+-        const res = await FetchSeriesGenre(10759);
+-        SetAction(res);
+-        setActionLoad(false);
+-      } catch (error) {
+-        console.log(error);
+-      }
+-    }
+-    getAction();
+-  }, []);
+   return (
+-    <div className="flex w-full flex-col overflow-hidden mb-[20px]">
+-      <h1 className=' font-bold text-2xl  z-[1000] font-inconsolata  capitalize px-2.5'>action</h1>
+-      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[330px]'>
+-        {actionLoad
++    <div className="flex w-full flex-col overflow-hidden ">
++      <h1 className=' font-bold text-2xl max-md:text-xl max-sm:text-lg   z-[1000] font-inconsolata  capitalize px-2.5'>action</h1>
++      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3 '>
++        {loading
+           ? Array(10).fill("").map((item, index) => {
+                 return (
+                   <div
+                     key={index}
+-                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 text-7xl shadow-md"
++                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 max-sm:active:scale-105 text-7xl shadow-md"
+                   > <Loading/>
+                   </div>
+                 );
+               })
+-          : action &&
+-            action.map((item, index) => {
++          : data &&
++            data.map((item, index) => {
+               return (
+-                <div key={index}  className=' shrink-0 w-[200px] h-[250px] hover:scale-105'>
+-               <Card key={index} image={item.poster_path} id={item.id} />
+-                  <h1 className='  text-center font-semibold font-inconsolata text-lg w-full truncate'>{item.name}</h1>
++                <div key={index}  className=' shrink-0 '>
++               <Card key={index} image={item.poster_path} id={item.id} title={item.name} />
+                 </div>
+               );
+             })}
+diff --git a/src/app/series/component/seriesGenre/animationSeries.jsx b/src/app/series/component/seriesGenre/animationSeries.jsx
+index 9a39461..c9c29ea 100644
+--- a/src/app/series/component/seriesGenre/animationSeries.jsx
++++ b/src/app/series/component/seriesGenre/animationSeries.jsx
+@@ -1,48 +1,31 @@
+ import React, { useEffect, useState } from "react";
+-import FetchSeriesGenre from "@/hook/series/fetchSeriesGener";
++import useFetchGenreSeries from "@/hook/series/fetchSeriesGener";
+ import Loading from "../SeriesLoading";
+ import Image from "next/image";
+ import Card from "@/app/movie/component/card";
+ 
+ const AnimationSeries = () => {
+-  const [action, SetAction] = useState(null);
+-  const [actionLoad, setActionLoad] = useState(false);
++  const{data,loading,error} = useFetchGenreSeries(16)
+ 
+-  const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
+-
+-  useEffect(() => {
+-    async function getAction() {
+-      try {
+-        setActionLoad(true);
+-        const res = await FetchSeriesGenre(16);
+-        SetAction(res);
+-        setActionLoad(false);
+-      } catch (error) {
+-        console.log(error);
+-      }
+-    }
+-    getAction();
+-  }, []);
+   return (
+-    <div className="flex w-full flex-col overflow-hidden mb-[20px]">
+-      <h1 className=' font-bold text-2xl  z-[1000] font-inconsolata  capitalize px-2.5'>animation</h1>
+-      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[330px]'>
+-        {actionLoad
++    <div className="flex w-full flex-col overflow-hidden ">
++      <h1 className=' font-bold text-2xl max-md:text-xl max-sm:text-lg   z-[1000] font-inconsolata  capitalize px-2.5'>animation</h1>
++      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3 '>
++        {loading
+           ? Array(10).fill("").map((item, index) => {
+                 return (
+                   <div
+                     key={index}
+-                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 text-7xl shadow-md"
++                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 max-sm:active:scale-105 text-7xl shadow-md"
+                   > <Loading/>
+                   </div>
+                 );
+               })
+-          : action &&
+-            action.map((item, index) => {
++          : data &&
++            data.map((item, index) => {
+               return (
+-                <div key={index}  className=' shrink-0 w-[200px] h-[250px] hover:scale-105'>
+-                 <Card key={index} image={item.poster_path} id={item.id} />
+-                  <h1 className='  text-center font-semibold font-inconsolata text-lg w-full truncate'>{item.name}</h1>
++                <div key={index}  className=' shrink-0'>
++                 <Card key={index} image={item.poster_path} id={item.id} title={item.name} />
+                 </div>
+               );
+             })}
+diff --git a/src/app/series/component/seriesGenre/comedySeries.jsx b/src/app/series/component/seriesGenre/comedySeries.jsx
+index 1f49ff2..7016cf5 100644
+--- a/src/app/series/component/seriesGenre/comedySeries.jsx
++++ b/src/app/series/component/seriesGenre/comedySeries.jsx
+@@ -1,48 +1,31 @@
+ import React, { useEffect, useState } from "react";
+-import FetchSeriesGenre from "@/hook/series/fetchSeriesGener";
++import useFetchGenreSeries from "@/hook/series/fetchSeriesGener";
+ import Loading from "../SeriesLoading";
+ import Image from "next/image";
+ import Card from "@/app/movie/component/card";
+ 
+ const ComedySeries = () => {
+-  const [action, SetAction] = useState(null);
+-  const [actionLoad, setActionLoad] = useState(false);
++  const{data,loading,error} = useFetchGenreSeries(35)
+ 
+-  const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
+-
+-  useEffect(() => {
+-    async function getAction() {
+-      try {
+-        setActionLoad(true);
+-        const res = await FetchSeriesGenre(35);
+-        SetAction(res);
+-        setActionLoad(false);
+-      } catch (error) {
+-        console.log(error);
+-      }
+-    }
+-    getAction();
+-  }, []);
+   return (
+-    <div className="flex w-full flex-col overflow-hidden mb-[20px]">
+-      <h1 className=' font-bold text-2xl  z-[1000] font-inconsolata  capitalize px-2.5'>comedy</h1>
+-      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[330px]'>
+-        {actionLoad
++    <div className="flex w-full flex-col overflow-hidden ">
++      <h1 className=' font-bold text-2xl max-md:text-xl max-sm:text-lg   z-[1000] font-inconsolata  capitalize px-2.5'>comedy</h1>
++      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3 '>
++        {loading
+           ? Array(10).fill("").map((item, index) => {
+                 return (
+                   <div
+                     key={index}
+-                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 text-7xl shadow-md"
++                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 max-sm:active:scale-105 text-7xl shadow-md"
+                   > <Loading/>
+                   </div>
+                 );
+               })
+-          : action &&
+-            action.map((item, index) => {
++          : data &&
++            data.map((item, index) => {
+               return (
+-                <div key={index}  className=' shrink-0 w-[200px] h-[250px] hover:scale-105'>
+-                <Card key={index} image={item.poster_path} id={item.id} />
+-                  <h1 className='  text-center font-semibold font-inconsolata text-lg w-full truncate'>{item.name}</h1>
++                <div key={index}  className=' shrink-0'>
++                <Card key={index} image={item.poster_path} id={item.id} title={item.name} />
+                 </div>
+               );
+             })}
+diff --git a/src/app/series/component/seriesGenre/crimeSeries.jsx b/src/app/series/component/seriesGenre/crimeSeries.jsx
+index cd3fa9a..7709ac3 100644
+--- a/src/app/series/component/seriesGenre/crimeSeries.jsx
++++ b/src/app/series/component/seriesGenre/crimeSeries.jsx
+@@ -1,48 +1,31 @@
+ import React, { useEffect, useState } from "react";
+-import FetchSeriesGenre from "@/hook/series/fetchSeriesGener";
++import useFetchGenreSeries from "@/hook/series/fetchSeriesGener";
+ import Loading from "../SeriesLoading";
+ import Image from "next/image";
+ import Card from "@/app/movie/component/card";
+ 
+ const CrimeSeries = () => {
+-  const [action, SetAction] = useState(null);
+-  const [actionLoad, setActionLoad] = useState(false);
++ const{data,loading,error} = useFetchGenreSeries(80)
+ 
+-  const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
+-
+-  useEffect(() => {
+-    async function getAction() {
+-      try {
+-        setActionLoad(true);
+-        const res = await FetchSeriesGenre(80);
+-        SetAction(res);
+-        setActionLoad(false);
+-      } catch (error) {
+-        console.log(error);
+-      }
+-    }
+-    getAction();
+-  }, []);
+   return (
+-    <div className="flex w-full flex-col overflow-hidden mb-[20px]">
+-      <h1 className=' font-bold text-2xl  z-[1000] font-inconsolata  capitalize px-2.5'>crime</h1>
+-      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[330px]'>
+-        {actionLoad
++    <div className="flex w-full flex-col overflow-hidden ">
++      <h1 className=' font-bold text-2xl max-md:text-xl max-sm:text-lg   z-[1000] font-inconsolata  capitalize px-2.5'>crime</h1>
++      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3 '>
++        {loading
+           ? Array(10).fill("").map((item, index) => {
+                 return (
+                   <div
+                     key={index}
+-                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 text-7xl shadow-md"
++                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 max-sm:active:scale-105 text-7xl shadow-md"
+                   > <Loading/>
+                   </div>
+                 );
+               })
+-          : action &&
+-            action.map((item, index) => {
++          : data &&
++            data.map((item, index) => {
+               return (
+-                <div key={index}  className=' shrink-0 w-[200px] h-[250px] hover:scale-105'>
+-                <Card key={index} image={item.poster_path} id={item.id} />
+-                  <h1 className='  text-center font-semibold font-inconsolata text-lg w-full truncate'>{item.name}</h1>
++                <div key={index}  className=' shrink-0'>
++                <Card key={index} image={item.poster_path} id={item.id} title={item.name} />
+                 </div>
+               );
+             })}
+diff --git a/src/app/series/component/seriesGenre/mystrySeries.jsx b/src/app/series/component/seriesGenre/mystrySeries.jsx
+index bf3f9b7..91873f9 100644
+--- a/src/app/series/component/seriesGenre/mystrySeries.jsx
++++ b/src/app/series/component/seriesGenre/mystrySeries.jsx
+@@ -1,48 +1,31 @@
+ import React, { useEffect, useState } from "react";
+-import FetchSeriesGenre from "@/hook/series/fetchSeriesGener";
++import useFetchGenreSeries from "@/hook/series/fetchSeriesGener";
+ import Loading from "../SeriesLoading";
+ import Image from "next/image";
+ import Card from "@/app/movie/component/card";
+ 
+ const MystrySeries = () => {
+-  const [action, SetAction] = useState(null);
+-  const [actionLoad, setActionLoad] = useState(false);
++ const{data,loading,error} = useFetchGenreSeries(9648)
+ 
+-  const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
+-
+-  useEffect(() => {
+-    async function getAction() {
+-      try {
+-        setActionLoad(true);
+-        const res = await FetchSeriesGenre(9648);
+-        SetAction(res);
+-        setActionLoad(false);
+-      } catch (error) {
+-        console.log(error);
+-      }
+-    }
+-    getAction();
+-  }, []);
+   return (
+-    <div className="flex w-full flex-col overflow-hidden mb-[20px]">
+-      <h1 className=' font-bold text-2xl  z-[1000] font-inconsolata  capitalize px-2.5'>mystry && reality</h1>
+-      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[330px]'>
+-        {actionLoad
++    <div className="flex w-full flex-col overflow-hidden ">
++      <h1 className=' font-bold text-2xl max-md:text-xl max-sm:text-lg   z-[1000] font-inconsolata  capitalize px-2.5'>mystry && reality</h1>
++      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3 '>
++        {loading
+           ? Array(10).fill("").map((item, index) => {
+                 return (
+                   <div
+                     key={index}
+-                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 text-7xl shadow-md"
++                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 max-sm:active:scale-105 text-7xl shadow-md"
+                   > <Loading/>
+                   </div>
+                 );
+               })
+-          : action &&
+-            action.map((item, index) => {
++          : data &&
++            data.map((item, index) => {
+               return (
+-                <div key={index}  className=' shrink-0 w-[200px] h-[250px] hover:scale-105'>
+-                 <Card key={index} image={item.poster_path} id={item.id} />
+-                  <h1 className='  text-center font-semibold font-inconsolata text-lg w-full truncate'>{item.name}</h1>
++                <div key={index}  className=' shrink-0'>
++                 <Card key={index} image={item.poster_path} id={item.id} title={item.name} />
+                 </div>
+               );
+             })}
+diff --git a/src/app/series/component/seriesGenre/warSeries.jsx b/src/app/series/component/seriesGenre/warSeries.jsx
+index 89a67af..3291c0b 100644
+--- a/src/app/series/component/seriesGenre/warSeries.jsx
++++ b/src/app/series/component/seriesGenre/warSeries.jsx
+@@ -1,48 +1,31 @@
+ import React, { useEffect, useState } from "react";
+-import FetchSeriesGenre from "@/hook/series/fetchSeriesGener";
++import useFetchGenreSeries from "@/hook/series/fetchSeriesGener";
+ import Loading from "../SeriesLoading";
+ import Image from "next/image";
+ import Card from "@/app/movie/component/card";
+ 
+ const WarSeries = () => {
+-  const [action, SetAction] = useState(null);
+-  const [actionLoad, setActionLoad] = useState(false);
++  const{data,loading,error} = useFetchGenreSeries(10768)
+ 
+-  const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
+-
+-  useEffect(() => {
+-    async function getAction() {
+-      try {
+-        setActionLoad(true);
+-        const res = await FetchSeriesGenre(10768);
+-        SetAction(res);
+-        setActionLoad(false);
+-      } catch (error) {
+-        console.log(error);
+-      }
+-    }
+-    getAction();
+-  }, []);
+   return (
+-    <div className="flex w-full flex-col overflow-hidden mb-[20px]">
+-      <h1 className=' font-bold text-2xl  z-[1000] font-inconsolata  capitalize px-2.5'>war</h1>
+-      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3  h-[330px]'>
+-        {actionLoad
++    <div className="flex w-full flex-col overflow-hidden">
++      <h1 className=' font-bold text-2xl max-md:text-xl max-sm:text-lg   z-[1000] font-inconsolata  capitalize px-2.5'>war</h1>
++      <div className='flex  gap-2 w-full overflow-x-scroll movie py-2 px-3 '>
++        {loading
+           ? Array(10).fill("").map((item, index) => {
+                 return (
+                   <div
+                     key={index}
+-                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 text-7xl shadow-md"
++                    className=" shrink-0 w-[200px] h-[250px] hover:scale-105 max-sm:active:scale-105 text-7xl shadow-md"
+                   > <Loading/>
+                   </div>
+                 );
+               })
+-          : action &&
+-            action.map((item, index) => {
++          : data &&
++            data.map((item, index) => {
+               return (
+-                <div key={index}  className=' shrink-0 w-[200px] h-[250px] hover:scale-105'>
+-               <Card key={index} image={item.poster_path} id={item.id} />
+-                  <h1 className='  text-center font-semibold font-inconsolata text-lg w-full truncate'>{item.name}</h1>
++                <div key={index}  className=' shrink-0'>
++               <Card key={index} image={item.poster_path} id={item.id} title={item.name} />
+                 </div>
+               );
+             })}

@@ -1,14 +1,30 @@
 "use client"
-import React from 'react'
-import Tmdb from '@/api/tmdb'
+import axios from "axios"
+import { useState,useEffect } from "react"
 
-const fetchPopular = async() => {
- try {
-    const res = await Tmdb.get("/movie/popular")
-    return res.data.results
- } catch (error) {
-    console.log(error)
- }
+export default function useFetchPopularMovies(){
+   const [data,setData] = useState([])
+   const [loading,setLoading] = useState(true)
+   const [error,setError] = useState(null)
+
+   useEffect(()=>{
+    let ignore =false
+
+    async function fetchData(){
+      try {
+        const res = await axios.get("/api/movie/popular") 
+        if(!ignore)setData(res.data.results)
+      } catch (error) {
+         if(!ignore) setError(error)
+      }
+   finally{
+      if(!ignore)setLoading(false)
+   }
+    }
+    fetchData()
+    return ()=>{
+      ignore = true
+    }
+   },[])
+   return{data,loading,error}
 }
-
-export default fetchPopular
