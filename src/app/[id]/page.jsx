@@ -42,6 +42,18 @@ const IdPage = () => {
     }
   }
 
+  function handleMovieDownload() {
+    if (!finalId) return;
+
+    const link = document.createElement("a");
+    link.href = `/api/movie/download?id=${finalId}`;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
   return (
     <div className=" flex justify-center flex-col items-center overflow-hidden bg-gray-900 w-full h-full min-h-screen ">
       <main className=" w-full flex flex-col relative">
@@ -95,7 +107,10 @@ const IdPage = () => {
               }} className="flex items-center gap-2 px-8 py-3 max-md:px-6 max-md:py-2 max-md:text-sm rounded-2xl bg-red-600 hover:bg-red-700 max-sm:active:bg-red-700 transition-all duration-200 hover:scale-105 max-sm:active:scale-105">
                 Watch now <BiMoviePlay size={22} />
               </button>
-              <button className="flex items-center gap-2 px-8 py-3 max-md:px-6 max-md:py-2 max-md:text-sm rounded-2xl bg-gray-700 hover:bg-gray-600 max-sm:active:bg-gray-600 transition-all duration-200 hover:scale-105 max-sm:active:scale-105">
+              <button
+                onClick={handleMovieDownload}
+                className="flex items-center gap-2 px-8 py-3 max-md:px-6 max-md:py-2 max-md:text-sm rounded-2xl bg-gray-700 hover:bg-gray-600 max-sm:active:bg-gray-600 transition-all duration-200 hover:scale-105 max-sm:active:scale-105"
+              >
                 Download <FaDownload size={20} />
               </button>
             </div>

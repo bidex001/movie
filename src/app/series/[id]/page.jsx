@@ -44,6 +44,17 @@ const TvPage = () => {
     }
   }
 
+  function handleDownLoad(){
+    if(!finalId) return;
+    const link = document.createElement("a")
+    link.href = `/api/movie/download?id=${finalId}`
+    link.target = "_blank"
+    link.rel = "noopener noreferrer";
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+  }
+
   return (
     <div className=" flex  flex-col items-center overflow-hidden bg-gray-900 w-full h-full min-h-screen ">
       <Header />
