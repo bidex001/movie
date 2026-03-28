@@ -291,7 +291,7 @@ const MoviePage = () => {
               </div>
             ) : (
               <div className="rounded-[1.5rem] border border-dashed border-white/10 bg-white/5 p-6 text-center text-white/60">
-                Cast information is not available right now.
+                Cast information is not available right now..
               </div>
             )}
           </div>
