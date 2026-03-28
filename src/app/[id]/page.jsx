@@ -1,48 +1,83 @@
 "use client";
-import React, { useEffect,useRef, useState } from "react";
-import { useContext } from "react";
-import AppContext from "@/context/context";
-import { useRouter } from "next/navigation";
-import useFetchMovieById from "@/hook/movies/fetchMovieById";
-import { useParams } from "next/navigation";
-import { FaDownload } from "react-icons/fa";
+export const dynamic = "force-dynamic";
+
+import React, { useContext, useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import { useParams, useRouter } from "next/navigation";
 import { BiMoviePlay } from "react-icons/bi";
-import Loading from "../movie/component/loading";
+import { FaDownload } from "react-icons/fa";
+import { IoStarSharp } from "react-icons/io5";
 import { MdDoubleArrow } from "react-icons/md";
+import AppContext from "@/context/context";
+import useFetchMovieById from "@/hook/movies/fetchMovieById";
+import Header from "../movie/component/headerMovie";
 import Watch from "../movie/component/watch";
+import PosterTiltCard from "../component/ui/posterTiltCard";
 
-const IdPage = () => {
-  const { movieId,setMovieId } = useContext(AppContext);
-    const [watch,setWatch] = useState(false)
+const formatDate = (value) => {
+  if (!value) return "Unknown";
 
+  return new Date(value).toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+const scoreTone = (score) => {
+  if (score >= 8) {
+    return "border-emerald-400/20 bg-emerald-500/15 text-emerald-200";
+  }
+
+  if (score >= 6) {
+    return "border-amber-400/20 bg-amber-500/15 text-amber-100";
+  }
+
+  return "border-rose-400/20 bg-rose-500/15 text-rose-100";
+};
+
+const MoviePage = () => {
+  const { movieId, setMovieId } = useContext(AppContext);
+  const [watch, setWatch] = useState(false);
   const router = useRouter();
   const { id: paramId } = useParams();
   const finalId = movieId || paramId;
   const { data, loading, error } = useFetchMovieById(finalId);
   const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL;
-  const scrollRef = useRef(null)
-  
+  const scrollRef = useRef(null);
 
   useEffect(() => {
     if (!finalId) {
       router.push("/");
     }
-  }, [finalId]);
+  }, [finalId, router]);
 
-  useEffect(() => {
-    console.log(data);
-  }, [data]);
+  const topCast = data?.credits?.cast?.slice(0, 10) || [];
+  const similarMovies = data?.similar?.results?.slice(0, 8) || [];
+  const runtimeLabel = data?.runtime
+    ? `${Math.floor(data.runtime / 60)}h ${data.runtime % 60}m`
+    : "Runtime unavailable";
 
-  function rightScroll(){
-    if(scrollRef.current){
-      scrollRef.current.scrollBy({
-        left: 200
-      })
-    }
-  }
+  const metaPills = [
+    data?.genres?.slice(0, 3).map((item) => item.name).join(" / "),
+    data?.original_language?.toUpperCase(),
+    data?.production_countries
+      ?.slice(0, 2)
+      .map((item) => item.iso_3166_1)
+      .join(", "),
+    data?.status,
+  ].filter(Boolean);
 
-  function handleMovieDownload() {
+  const rightScroll = () => {
+    if (!scrollRef.current) return;
+
+    scrollRef.current.scrollBy({
+      left: 260,
+      behavior: "smooth",
+    });
+  };
+
+  const handleMovieDownload = () => {
     if (!finalId) return;
 
     const link = document.createElement("a");
@@ -52,150 +87,251 @@ const IdPage = () => {
     document.body.appendChild(link);
     link.click();
     link.remove();
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#02030a] text-white">
+        <Header />
+        <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pb-12 pt-28 sm:px-6 lg:px-8">
+          <div className="h-[540px] animate-pulse rounded-[2.5rem] border border-white/10 bg-white/5" />
+          <div className="grid gap-4 lg:grid-cols-[1.35fr_0.95fr]">
+            <div className="h-[320px] animate-pulse rounded-[2rem] border border-white/10 bg-white/5" />
+            <div className="h-[320px] animate-pulse rounded-[2rem] border border-white/10 bg-white/5" />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="min-h-screen bg-[#02030a] text-white">
+        <Header />
+        <main className="mx-auto flex min-h-[70vh] w-full max-w-5xl items-center justify-center px-4 pt-28 sm:px-6 lg:px-8">
+          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-8 text-center shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
+            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-amber-300/80">
+              Movie unavailable
+            </p>
+            <h1 className="mt-4 text-3xl font-semibold text-white">
+              We could not load this movie.
+            </h1>
+            <button
+              className="mt-6 rounded-full border border-amber-400/30 bg-amber-400/10 px-5 py-3 font-semibold text-amber-100 transition hover:bg-amber-400/15"
+              onClick={() => router.push("/")}
+              type="button"
+            >
+              Back to movies
+            </button>
+          </div>
+        </main>
+      </div>
+    );
   }
 
   return (
-    <div className=" flex justify-center flex-col items-center overflow-hidden bg-gray-900 w-full h-full min-h-screen ">
-      <main className=" w-full flex flex-col relative">
-        <div className="flex  flex-col w-full h-full overflow-hidden z-[500] relative ">
-        {data ? (
-          <Image
-            className=" h-[670px] max-md:h-[500px] w-full object-cover object-center  brightness-50 "
-            src={`${baseImgUrl}${data.backdrop_path}`}
-            alt={data.title || "Movie backdrop"}
-            width={1700}
-            height={1500}
-          />
-        ) : (
-          <p>No backdrop available</p>
-        )}
-        <div className=" w-[600px] h-full absolute gap-4 max-md:bg-gradient-to-l max-md:from-transparent  max-md:to-transparent  bg-gradient-to-l p-4 capitalize   from-transparent flex flex-col justify-center to-gray-900">
-          {" "}
-        </div>
-        <div className="  absolute w-full h-fit z-50 py-9 px-6  max-md:py-5  bottom-0  bg-gradient-to-b from-transparent to-gray-900">
-          <div className=" w-[700px] max-md:w-full flex flex-col gap-3 max-md:gap-1">
-            <h1 className="text text-6xl max-lg:text-5xl max-md:text-4xl max-sm:text-2xl max-xs:text-xl font-inconsolata font-bold text-white">
-              {data && data.title}
-            </h1>
-            <p className="txt font-semibold text-lg max-md:text-sm max-md:text-gray-500 text-white">
-              {data && data.overview}
-            </p>
-            <div className="flex  items-center gap-4 font-bold font-inconsolata text-white text-lg max-md:text-sm">
-              <p
-                className={` font-inconsolata h-[50px] max-md:h-[40px] text-black flex items-center font-bold text-lg  max-md:text-sm justify-center w-[50px] max-md:w-[40px] p-2  rounded-full
-          ${data?.vote_average < 6 && "bg-red-500"}
-          ${data?.vote_average < 8 && data?.vote_average > 6 && "bg-yellow-500"}
-          ${data?.vote_average >= 8 && "bg-green-600"}
-          `}
-              >
-                {data &&
-                  data.vote_average &&
-                  (data && data.vote_average).toFixed(2)}
-              </p>
-              <p>{data?.release_date}</p>
-              <p className=" uppercase">{data?.original_language}</p>
-              <p className="uppercase">{data?.origin_country}</p>
-              <p className=" text-yellow-500 font-bold ">
-                {data?.runtime
-                  ? `${Math.floor(data.runtime / 60)}h ${data.runtime % 60}m`
-                  : "N/A"}{" "}
-              </p>
-            </div>
-              <div className="flex gap-6 mt-4">
-              <button onClick={()=>{
-                setWatch(true)
-              }} className="flex items-center gap-2 px-8 py-3 max-md:px-6 max-md:py-2 max-md:text-sm rounded-2xl bg-red-600 hover:bg-red-700 max-sm:active:bg-red-700 transition-all duration-200 hover:scale-105 max-sm:active:scale-105">
-                Watch now <BiMoviePlay size={22} />
-              </button>
-              <button
-                onClick={handleMovieDownload}
-                className="flex items-center gap-2 px-8 py-3 max-md:px-6 max-md:py-2 max-md:text-sm rounded-2xl bg-gray-700 hover:bg-gray-600 max-sm:active:bg-gray-600 transition-all duration-200 hover:scale-105 max-sm:active:scale-105"
-              >
-                Download <FaDownload size={20} />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-      {watch && <Watch watch={watch} data={data} setWatch={setWatch}/>}
-      </main>
-      <div className=" w-full flex max-lg:flex-col   gap-3 h-[400px] max-lg:h-fit justify-start ">
-        <div className=" w-[1200px] max-lg:w-full relative ">
-          <h1 className="  font-inconsolata font-bold text-2xl max-md:text-xl max-sm:text-lg max-xs:text-sm p-2 w-full capitalize text-white">
-            top cast (10)
-          </h1>
-          <div className="w-full forcast h-full flex gap-3 p-2 *:shrink-0 item-center  overflow-x-scroll"
-          ref={scrollRef}>
-            {loading
-              ? Array(10).map((_, i) => {
-                  <div
-                    key={i}
-                    className=" w-[200px] h-[300px] border-gray-500 animate-pulse"
-                  >
-                    <Loading />
-                  </div>;
-                })
-              : data &&
-                data.credits.cast.slice(0, 10).map((item, index) => {
-                  return (
-                    <div
-                      key={index}
-                      className=" w-[200px] gap-2 h-[300px] max-md:h-[250px] max-md:w-[150px] flex flex-col items-center justify-center overflow-hidden"
-                      onClick={()=>{
-                        router.push(`/person/${item.id}`)
-                      }}
-                    >
-                      <Image
-                        src={`${baseImgUrl}${item.profile_path}`}
-                        alt={item.name ? item.name : "name"}
-                        width={200}
-                        height={250}
-                        className=" w-full h-[250px] cursor-pointer hover:scale-110 max-sm:active:scale-110 max-md:h-[200px] rounded-lg"
-                      />
-                      <div className=" w-full flex flex-col gap-1 max-md:gap-0">
-                        <p className=" text-center truncate text-lg max-md:text-sm font-inconsolata font-bold text-white">
-                          {item.name}
-                        </p>
-                        <p className="text-center  truncate w-full text-lg max-md:text-sm text-gray-400 ">
-                          {item.character}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-                <button className=" font-inconsolata text-4xl max-md:text-2xl flex justify-center items-center text-white border active:scale-90 bg-gray-900 p-2 rounded-full absolute right-[-20px] max-md:right-0 top-[150px]"
-                onClick={()=>{
-                  rightScroll()
-                }}><MdDoubleArrow /></button>
-          </div>
-        </div>
+    <div className="min-h-screen bg-[#02030a] text-white">
+      <Header />
 
-        <div className="flex flex-col items-center gap-2">
-          <h1 className="capitalize text-2xl max-lg:text-left max-lg:flex max-lg:w-full px-3 text-gray-200 font-bold">recommend</h1>
-          <div className="flex flex-wrap max-lg:px-2 max-sm:px-1 gap-4 max-sm:gap-3  justify-center overflow-y-scroll forcast">
-            {data &&
-              data.similar.results.slice(0, 10).map((item, index) => {
-                return (
-                  <Image
-                    src={`${baseImgUrl + item.poster_path}`}
-                    alt={item.title}
-                    key={index}
-                    width={160}
-                    height={200}
-                    id={item.id}
-                    onClick={()=>{
-                      setMovieId(item.id)
-                      router.push(`/${item.id}`)
-                    }}
-                    className=" max-md:w-[150px] max-md:h-[200px] max-sm:w-[160px] max-md:rounded-lg cursor-pointer hover:scale-110 max-sm:active:scale-110"
-                  />
-                );
-              })}
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 pb-12 pt-28 sm:px-6 lg:px-8">
+        <section className="relative overflow-hidden rounded-[2.5rem] border border-white/10 bg-[#04060d] shadow-[0_30px_90px_rgba(0,0,0,0.35)]">
+          {data?.backdrop_path ? (
+            <Image
+              alt={data?.title || data?.original_title || "Movie backdrop"}
+              className="absolute inset-0 h-full w-full scale-[1.03] object-cover object-center opacity-30"
+              fill
+              sizes="100vw"
+              src={`${baseImgUrl}${data.backdrop_path}`}
+            />
+          ) : null}
+
+          <div className="hero-aurora absolute inset-0" />
+          <div className="absolute inset-[-18%] opacity-80">
+            <div className="hero-orb hero-orb-amber" />
+            <div className="hero-orb hero-orb-blue" />
+            <div className="hero-orb hero-orb-sky" />
           </div>
-        </div>
-      </div>
+          <div className="hero-grid absolute inset-0 opacity-20" />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,23,0.28),rgba(2,6,23,0.86)_56%,rgba(2,6,23,0.98))]" />
+
+          <div className="relative z-10 grid min-h-[620px] gap-8 p-6 sm:p-8 lg:grid-cols-[1fr_320px] lg:items-end lg:p-10">
+            <div className="space-y-8">
+              <div className="max-w-4xl space-y-5">
+                <div className="flex flex-wrap gap-3">
+                  {metaPills.map((item) => (
+                    <span
+                      className="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-white/80 backdrop-blur"
+                      key={item}
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </div>
+
+                <h1 className="max-w-4xl text-4xl font-semibold leading-tight text-white sm:text-5xl lg:text-6xl">
+                  {data?.title || data?.original_title}
+                </h1>
+
+                <p className="max-w-3xl text-sm leading-7 text-white/75 sm:text-base">
+                  {data?.overview || "No synopsis is available for this movie yet."}
+                </p>
+
+                <div className="flex flex-wrap items-center gap-3 text-sm text-white/80">
+                  <div
+                    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 font-semibold ${scoreTone(
+                      data?.vote_average || 0,
+                    )}`}
+                  >
+                    <IoStarSharp />
+                    {(data?.vote_average || 0).toFixed(1)} viewer score
+                  </div>
+                  <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2">
+                    {formatDate(data?.release_date)}
+                  </span>
+                  <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2">
+                    {runtimeLabel}
+                  </span>
+                  {data?.vote_count ? (
+                    <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2">
+                      {data.vote_count.toLocaleString()} votes
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <button
+                  className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-5 py-3 font-semibold text-black transition hover:bg-amber-300"
+                  onClick={() => setWatch(true)}
+                  type="button"
+                >
+                  <BiMoviePlay className="text-xl" />
+                  Watch now
+                </button>
+                <button
+                  className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-3 font-semibold text-white transition hover:bg-white/15"
+                  onClick={handleMovieDownload}
+                  type="button"
+                >
+                  <FaDownload />
+                  Download details
+                </button>
+              </div>
+            </div>
+
+            <div className="hidden justify-end lg:flex">
+              <PosterTiltCard
+                baseImgUrl={baseImgUrl}
+                className="w-[300px]"
+                imageClassName="h-[420px]"
+                item={data}
+                onSelect={() => setWatch(true)}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-[1.35fr_0.95fr]">
+          <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#09090b]/85 p-5 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.32em] text-amber-300/80">
+                  Cast
+                </p>
+                <h2 className="mt-2 text-3xl font-semibold text-white">
+                  Top cast
+                </h2>
+              </div>
+
+              <button
+                className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white transition hover:bg-white/10"
+                onClick={rightScroll}
+                type="button"
+              >
+                <MdDoubleArrow className="text-2xl" />
+              </button>
+            </div>
+
+            {topCast.length ? (
+              <div
+                className="forcast flex gap-4 overflow-x-auto pb-2"
+                ref={scrollRef}
+              >
+                {topCast.map((person) => (
+                  <button
+                    className="group w-[190px] shrink-0 rounded-[1.75rem] border border-white/10 bg-white/5 p-3 text-left transition hover:-translate-y-1 hover:bg-white/10"
+                    key={person.id}
+                    onClick={() => router.push(`/person/${person.id}`)}
+                    type="button"
+                  >
+                    {person.profile_path ? (
+                      <Image
+                        alt={person.name || "Cast member"}
+                        className="h-[240px] w-full rounded-[1.2rem] object-cover"
+                        height={260}
+                        src={`${baseImgUrl}${person.profile_path}`}
+                        width={190}
+                      />
+                    ) : (
+                      <div className="flex h-[240px] w-full items-center justify-center rounded-[1.2rem] border border-dashed border-white/10 bg-black/20 text-sm text-white/45">
+                        No image
+                      </div>
+                    )}
+
+                    <div className="mt-4">
+                      <p className="truncate text-lg font-semibold text-white">
+                        {person.name}
+                      </p>
+                      <p className="truncate text-sm text-white/55">
+                        {person.character}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-[1.5rem] border border-dashed border-white/10 bg-white/5 p-6 text-center text-white/60">
+                Cast information is not available right now.
+              </div>
+            )}
+          </div>
+
+          <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-[#09090b]/85 p-5 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.32em] text-amber-300/80">
+              Recommendations
+            </p>
+            <h2 className="mt-2 text-3xl font-semibold text-white">
+              More like this
+            </h2>
+
+            {similarMovies.length ? (
+              <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-2">
+                {similarMovies.map((item) => (
+                  <PosterTiltCard
+                    baseImgUrl={baseImgUrl}
+                    className="w-full"
+                    imageClassName="h-[220px]"
+                    item={item}
+                    key={item.id}
+                    onSelect={() => {
+                      setMovieId(item.id);
+                      router.push(`/${item.id}`);
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="mt-5 rounded-[1.5rem] border border-dashed border-white/10 bg-white/5 p-6 text-center text-white/60">
+                Similar movie suggestions are not available right now.
+              </div>
+            )}
+          </div>
+        </section>
+      </main>
+
+      {watch ? <Watch data={data} setWatch={setWatch} watch={watch} /> : null}
     </div>
   );
 };
 
-export default IdPage;
+export default MoviePage;

@@ -14,14 +14,10 @@ import SciMovies from './gener/sciencfic'
 import ThrilMovies from './gener/thriller'
 import WestMovies from './gener/western'
 import WarMovies from './gener/war'
-import Link from 'next/link'
 
 const Main = () => {
-
-    const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL
-
   return (
-    <div className='flex flex-col flex-1 gap-2 items-center'>
+    <div className='flex flex-col flex-1 gap-8 items-center pb-10'>
        <div className=' w-full flex h-full relative'>
         <Slider/>
        </div>

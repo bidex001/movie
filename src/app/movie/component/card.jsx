@@ -1,54 +1,121 @@
-import React from "react";
+"use client";
+
+import React, { useContext, useState } from "react";
 import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
 import { BiCameraMovie } from "react-icons/bi";
-import { useRouter } from "next/navigation";
-import { useContext } from "react";
 import AppContext from "@/context/context";
-import { usePathname } from "next/navigation";
-import { FaCheck } from "react-icons/fa";
 
 const Card = ({ title, image, id }) => {
   const baseImgUrl = process.env.NEXT_PUBLIC_TMDB_IMAGE_URL;
-  const {setMovieId,setSeriesId} = useContext(AppContext)
-  const router = useRouter()
-  const pathName = usePathname()
+  const { setMovieId, setSeriesId } = useContext(AppContext);
+  const router = useRouter();
+  const pathname = usePathname();
+  const [tilt, setTilt] = useState({
+    rotateX: 0,
+    rotateY: 0,
+    glowX: "50%",
+    glowY: "20%",
+    active: false,
+  });
+
+  const handleMove = (event) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const offsetX = (event.clientX - bounds.left) / bounds.width;
+    const offsetY = (event.clientY - bounds.top) / bounds.height;
+
+    setTilt({
+      active: true,
+      glowX: `${offsetX * 100}%`,
+      glowY: `${offsetY * 100}%`,
+      rotateX: (0.5 - offsetY) * 18,
+      rotateY: (offsetX - 0.5) * 18,
+    });
+  };
+
+  const resetTilt = () => {
+    setTilt({
+      rotateX: 0,
+      rotateY: 0,
+      glowX: "50%",
+      glowY: "20%",
+      active: false,
+    });
+  };
+
+  const handleNavigate = () => {
+    if (pathname.startsWith("/series")) {
+      setSeriesId(id);
+      router.push(`/series/${id}`);
+      return;
+    }
+
+    setMovieId(id);
+    router.push(`/${id}`);
+  };
 
   return (
-    <div className=" shrink-0 w-[200px] h-[250px] max-md:h-[200px] max-md:w-[150px]  hover:scale-105 max-sm:active:scale-105 flex flex-col relative "
-    onClick={()=>{
-      if(pathName == "/"){
-        setMovieId(id)
-        router.push(`/${id}`)
-      }
-      else if(pathName == "/series"){
-        setSeriesId(id)
-        router.push(`/series/${id}`)
-      }
-    }}
+    <button
+      className="group relative h-[250px] w-[180px] shrink-0 bg-transparent text-left [perspective:1400px] max-md:h-[220px] max-md:w-[155px]"
+      onClick={handleNavigate}
+      onMouseLeave={resetTilt}
+      onMouseMove={handleMove}
+      onTouchEnd={resetTilt}
+      type="button"
     >
-      {image ? (
-        <Image
-          src={`${baseImgUrl + image}`}
-          alt={title ? title : "images"}
-          width={200}
-          height={250}
-          priority
-          className="w-full h-full object-cover rounded-md shadow-md"
+      <div
+        className="relative h-full w-full overflow-hidden rounded-[1.65rem] border border-white/10 bg-[#05070d] transition duration-300 will-change-transform [transform-style:preserve-3d] group-hover:shadow-[0_28px_60px_rgba(0,0,0,0.45)]"
+        style={{
+          transform: `rotateX(${tilt.rotateX}deg) rotateY(${tilt.rotateY}deg) scale(${tilt.active ? 1.03 : 1})`,
+          boxShadow: tilt.active
+            ? "0 26px 70px rgba(0, 0, 0, 0.46)"
+            : "0 18px 40px rgba(0, 0, 0, 0.32)",
+        }}
+      >
+        <div
+          className="absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100"
+          style={{
+            background: `radial-gradient(circle at ${tilt.glowX} ${tilt.glowY}, rgba(250, 204, 21, 0.24), transparent 34%)`,
+            transform: "translateZ(20px)",
+          }}
         />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center bg-gray-800">
-          <BiCameraMovie className="text-4xl text-gray-500" />
+
+        {image ? (
+          <Image
+            alt={title || "Poster"}
+            className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
+            fill
+            sizes="(max-width: 768px) 155px, 180px"
+            src={`${baseImgUrl}${image}`}
+            style={{
+              transform: tilt.active ? "translateZ(42px)" : "translateZ(0px)",
+            }}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-4xl text-white/28">
+            <BiCameraMovie />
+          </div>
+        )}
+
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,23,0.02),rgba(2,6,23,0.7)_68%,rgba(2,6,23,0.98))]" />
+
+        <div
+          className="absolute inset-x-0 bottom-0 p-4"
+          style={{
+            transform: tilt.active ? "translateZ(60px)" : "translateZ(0px)",
+          }}
+        >
+          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-amber-200/75">
+            Featured poster
+          </p>
+          <h3 className="mt-2 truncate text-sm font-semibold text-white">
+            {title}
+          </h3>
+          <p className="mt-1 text-xs text-white/56">Open details</p>
         </div>
-      )}
-      <div className="flex items-start gap-2 *:opacity-0 *:font-inconsolata font-semibold hover:*:opacity-100 max-sm:active:*:opacity-100 absolute top-[0px] left-[0px] w-full *:transition-opacity max-md:*:text-sm *:duration-500 *:delay-500 hover:bg-black/50 max-sm:active:bg-black/50 bg-transparent h-full p-2 " >
-        <p>{title}</p>
-        <button className="border p-1 rounded-lg cursor-pointer active:bg-green-600"
-        title="Add to favourite"><FaCheck/></button>
       </div>
-    </div>
-    
+    </button>
   );
 };
 
 export default Card;
-

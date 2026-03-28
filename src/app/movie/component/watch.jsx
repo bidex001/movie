@@ -6,28 +6,38 @@ const Watch = ({ watch, setWatch, data }) => {
   return (
     <div>
       {watch && (
-        <div className="w-full h-screen max-md:h-full max-md:w-full  border-b-2 border-gray-400  z-[1000] flex flex-col bg-gray-900 absolute top-0">
-          <div className=" w-full relative flex-1">
+        <div className="fixed inset-0 z-[1000] flex flex-col bg-black/95 backdrop-blur-sm">
+          <div className="flex h-16 items-center justify-between border-b border-white/10 px-4 sm:px-6 lg:px-8">
+            <div className="text-sm font-semibold text-white/80 uppercase tracking-[0.2em]">
+              Video Player
+            </div>
             <button
-              className="absolute cursor-pointer text-gray-500 right-3 top-3 hover:scale-110 max-sm:active:scale-110 text-3xl"
-              onClick={() => {
-                setWatch(false);
-              }}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white transition hover:bg-white/10"
+              onClick={() => setWatch(false)}
+              type="button"
             >
-              <FaXmark />
+              <FaXmark className="text-xl" />
             </button>
           </div>
-         {
-          data?(
-             <iframe
-            src={`https://vidsrc.me/embed/movie?imdb=${data.imdb_id}`}
-            style={{ width: "100%", height: "100%" }}
-            frameBorder="0"
-            referrerPolicy="origin"
-            allowFullScreen
-          ></iframe>
-          ):"loading"
-         }
+          <div className="relative flex-1">
+            {data && data.imdb_id ? (
+              <iframe
+                src={`https://vidsrc.me/embed/movie?imdb=${data.imdb_id}`}
+                style={{ width: "100%", height: "100%" }}
+                frameBorder="0"
+                referrerPolicy="origin"
+                allowFullScreen
+                className="bg-black"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center">
+                <div className="text-center">
+                  <p className="text-lg font-semibold text-white/80">Loading video...</p>
+                  <p className="mt-2 text-sm text-white/60">Please wait</p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
