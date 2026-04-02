@@ -200,3 +200,28 @@ body {
   color: transparent;
   background-color: white;
 }
+
+@keyframes border-beam {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-border-beam {
+  animation: border-beam 3s linear infinite;
+}
+
+.footer-beam::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.4), transparent);
+  animation: border-beam 4s ease-in-out infinite;
+  pointer-events: none;
+}
